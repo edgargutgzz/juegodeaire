@@ -149,6 +149,10 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.player, this.contaminants, this.onHit, undefined, this);
 
+    // Cars
+    this.makeCars();
+    this.showIntroMessage();
+
     // Camera
     this.cameras.main.setBounds(0, 0, LEVEL_WIDTH, 720);
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -237,6 +241,121 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.once("camerafadeoutcomplete", () => {
       this.scene.start("LevelCompleteScene");
     });
+  }
+
+  private makeCars() {
+    const carPositions = [380, 780, 1300, 1900, 2450, 3000];
+    const carColors = ["#c0392b", "#2980b9", "#27ae60", "#8e44ad", "#e67e22", "#2c3e50"];
+
+    carPositions.forEach((x, i) => {
+      const color = carColors[i % carColors.length];
+      const key = `car_${i}`;
+
+      const c = document.createElement("canvas");
+      c.width = 130;
+      c.height = 58;
+      const ctx = c.getContext("2d")!;
+
+      // Body
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(0, 18, 130, 28, 4);
+      ctx.fill();
+
+      // Roof
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(22, 4, 76, 20, 6);
+      ctx.fill();
+
+      // Windows
+      ctx.fillStyle = "rgba(180,220,255,0.8)";
+      ctx.fillRect(26, 7, 28, 14);
+      ctx.fillRect(60, 7, 28, 14);
+
+      // Wheels
+      ctx.fillStyle = "#222";
+      [22, 102].forEach(wx => {
+        ctx.beginPath(); ctx.arc(wx, 46, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#888";
+        ctx.beginPath(); ctx.arc(wx, 46, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#222";
+      });
+
+      // Exhaust pipe
+      ctx.fillStyle = "#555";
+      ctx.fillRect(0, 36, 8, 5);
+
+      this.textures.addCanvas(key, c);
+      const car = this.add.image(x, GROUND_TOP - 28, key).setOrigin(0, 1).setDepth(1);
+
+      // Exhaust particles from the back of the car
+      const exhaustX = x - 4;
+      const exhaustY = GROUND_TOP - 34;
+      this.add.particles(exhaustX, exhaustY, "smog2", {
+        speed: { min: 5, max: 20 },
+        angle: { min: 160, max: 200 },
+        scale: { start: 0.4, end: 0.05 },
+        alpha: { start: 0.9, end: 0 },
+        lifespan: 2000,
+        frequency: 400,
+        gravityY: -30,
+      }).setDepth(1);
+
+      // Label on first two cars only
+      if (i < 2) {
+        this.add.text(car.x + 65, GROUND_TOP - 90, "fuente de\ncontaminación", {
+          fontSize: "13px",
+          fontFamily: "monospace",
+          color: "#cc3300",
+          align: "center",
+        }).setOrigin(0.5).setDepth(2);
+
+        // Arrow pointing down to car
+        const arrow = this.add.graphics().setDepth(2);
+        arrow.fillStyle(0xcc3300);
+        arrow.fillTriangle(car.x + 65, GROUND_TOP - 68, car.x + 58, GROUND_TOP - 80, car.x + 72, GROUND_TOP - 80);
+      }
+    });
+  }
+
+  private showIntroMessage() {
+    const bg = this.add.rectangle(640, 360, 700, 160, 0x000000, 0.75)
+      .setScrollFactor(0).setDepth(20);
+
+    this.add.text(640, 310, "NIVEL 1: EL TRÁFICO", {
+      fontSize: "26px", fontFamily: "monospace", color: "#ffffff", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+    this.add.text(640, 355, "Los autos queman combustible y\nliberan gases contaminantes al aire.", {
+      fontSize: "17px", fontFamily: "monospace", color: "#cccccc", align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+    const hint = this.add.text(640, 410, "— presiona cualquier tecla para comenzar —", {
+      fontSize: "13px", fontFamily: "monospace", color: "#aaaaaa",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+    this.tweens.add({ targets: hint, alpha: 0, duration: 500, yoyo: true, repeat: -1 });
+
+    // Freeze player until dismissed
+    this.levelComplete = true;
+
+    const dismiss = () => {
+      this.tweens.add({
+        targets: [bg, hint],
+        alpha: 0,
+        duration: 400,
+        onComplete: () => {
+          bg.destroy();
+          this.levelComplete = false;
+        },
+      });
+      this.input.keyboard!.off("keydown", dismiss);
+      this.input.gamepad!.off("down", dismiss);
+    };
+
+    this.input.keyboard!.once("keydown", dismiss);
+    this.input.gamepad!.once("down", dismiss);
   }
 
   private makeCircleTexture(key: string, radius: number, color: number, alpha: number) {
