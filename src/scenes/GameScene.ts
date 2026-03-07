@@ -316,11 +316,11 @@ export class GameScene extends Phaser.Scene {
     const bg = this.add.rectangle(640, 360, 700, 160, 0x000000, 0.75)
       .setScrollFactor(0).setDepth(20);
 
-    this.add.text(640, 310, "NIVEL 1: EL TRÁFICO", {
+    const title = this.add.text(640, 310, "NIVEL 1: EL TRÁFICO", {
       fontSize: "26px", fontFamily: "monospace", color: "#ffffff", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
-    this.add.text(640, 355, "Los autos queman combustible y\nliberan gases contaminantes al aire.", {
+    const subtitle = this.add.text(640, 355, "Los autos queman combustible y\nliberan gases contaminantes al aire.", {
       fontSize: "17px", fontFamily: "monospace", color: "#cccccc", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
@@ -330,16 +330,16 @@ export class GameScene extends Phaser.Scene {
 
     this.tweens.add({ targets: hint, alpha: 0, duration: 500, yoyo: true, repeat: -1 });
 
-    // Freeze player until dismissed
     this.levelComplete = true;
 
     const dismiss = () => {
+      this.tweens.killTweensOf(hint);
       this.tweens.add({
-        targets: [bg, hint],
+        targets: [bg, title, subtitle, hint],
         alpha: 0,
         duration: 400,
         onComplete: () => {
-          bg.destroy();
+          bg.destroy(); title.destroy(); subtitle.destroy(); hint.destroy();
           this.levelComplete = false;
         },
       });
