@@ -49,8 +49,7 @@ export class GameScene extends Phaser.Scene {
   private goalX = 0;
   private health = 5;
   private healthBar!: Phaser.GameObjects.Graphics;
-  private carGroup!: Phaser.Physics.Arcade.Group;
-  private carEmitters: { car: Phaser.Physics.Arcade.Image; emitter: Phaser.GameObjects.Particles.ParticleEmitter; dir: number }[] = [];
+  private carEmitters: { car: Phaser.GameObjects.Image; emitter: Phaser.GameObjects.Particles.ParticleEmitter; dir: number; speed: number }[] = [];
 
   constructor() {
     super("GameScene");
@@ -212,13 +211,21 @@ export class GameScene extends Phaser.Scene {
       this.onLevelComplete();
     }
 
-    // Move emitters with cars, wrap cars at world edges
-    for (const { car, emitter, dir } of this.carEmitters) {
-      const exhaustOffset = dir === 1 ? -38 : 38;
-      emitter.setPosition(car.x + exhaustOffset, GROUND_TOP - 22);
+    // Move cars and sync exhaust emitters
+    const delta = this.game.loop.delta / 1000;
+    for (const entry of this.carEmitters) {
+      entry.car.x += entry.speed * entry.dir * delta;
 
-      if (dir === 1 && car.x > LEVEL_WIDTH + 100) car.setX(-100);
-      if (dir === -1 && car.x < -100) car.setX(LEVEL_WIDTH + 100);
+      if (entry.dir === 1 && entry.car.x > LEVEL_WIDTH + 100) entry.car.x = -100;
+      if (entry.dir === -1 && entry.car.x < -100) entry.car.x = LEVEL_WIDTH + 100;
+
+      const exhaustOffset = entry.dir === 1 ? -48 : 48;
+      entry.emitter.setPosition(entry.car.x + exhaustOffset, GROUND_TOP - 30);
+
+      // Simple player overlap check
+      if (!this.invincible && Math.abs(entry.car.x - this.player.x) < 50 && this.player.y > GROUND_TOP - 80) {
+        this.onHit();
+      }
     }
 
     if (!onGround) {
@@ -268,21 +275,14 @@ export class GameScene extends Phaser.Scene {
       { x: 3200, key: "car_van",              speed: 80,  dir: -1 },
     ];
 
-    this.carGroup = this.physics.add.group();
-
     carDefs.forEach(({ x, key, speed, dir }, i) => {
-      const car = this.physics.add.image(x, GROUND_TOP - 8, key)
+      const car = this.add.image(x, GROUND_TOP - 8, key)
         .setOrigin(0.5, 1)
         .setScale(1.6)
-        .setDepth(1) as Phaser.Physics.Arcade.Image;
+        .setDepth(1)
+        .setFlipX(dir === -1);
 
-      (car.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
-      car.setVelocityX(speed * dir);
-      car.setFlipX(dir === -1);
-      this.carGroup.add(car);
-
-      // Exhaust emitter — position updated each frame
-      const emitter = this.add.particles(x, GROUND_TOP - 22, "smog2", {
+      const emitter = this.add.particles(x, GROUND_TOP - 30, "smog2", {
         speed: { min: 5, max: 25 },
         angle: { min: 160, max: 200 },
         scale: { start: 0.5, end: 0.05 },
@@ -292,23 +292,19 @@ export class GameScene extends Phaser.Scene {
         gravityY: -40,
       }).setDepth(1);
 
-      this.carEmitters.push({ car, emitter, dir });
+      this.carEmitters.push({ car, emitter, dir, speed });
 
-      // Label on first two cars only
       if (i < 2) {
-        this.add.text(x, GROUND_TOP - 120, "fuente de\ncontaminación", {
+        this.add.text(x, GROUND_TOP - 130, "fuente de\ncontaminación", {
           fontSize: "13px", fontFamily: "monospace",
           color: "#cc3300", align: "center",
         }).setOrigin(0.5).setDepth(2);
 
         const arrow = this.add.graphics().setDepth(2);
         arrow.fillStyle(0xcc3300);
-        arrow.fillTriangle(x, GROUND_TOP - 98, x - 8, GROUND_TOP - 110, x + 8, GROUND_TOP - 110);
+        arrow.fillTriangle(x, GROUND_TOP - 108, x - 8, GROUND_TOP - 120, x + 8, GROUND_TOP - 120);
       }
     });
-
-    // Cars hurt the player too
-    this.physics.add.overlap(this.player, this.carGroup, this.onHit, undefined, this);
   }
 
   private showIntroMessage() {
