@@ -55,11 +55,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("char_idle", "/assets/character/character_maleAdventurer_idle.png");
-    this.load.image("char_jump", "/assets/character/character_maleAdventurer_jump.png");
-    this.load.image("char_fall", "/assets/character/character_maleAdventurer_fall.png");
+    const gender = (this.registry.get("character") as string) === "female" ? "femaleAdventurer" : "maleAdventurer";
+    this.load.image("char_idle", `/assets/character/character_${gender}_idle.png`);
+    this.load.image("char_jump", `/assets/character/character_${gender}_jump.png`);
+    this.load.image("char_fall", `/assets/character/character_${gender}_fall.png`);
     for (let i = 0; i < 8; i++) {
-      this.load.image(`char_walk${i}`, `/assets/character/character_maleAdventurer_walk${i}.png`);
+      this.load.image(`char_walk${i}`, `/assets/character/character_${gender}_walk${i}.png`);
     }
 
     const buildingKeys = [

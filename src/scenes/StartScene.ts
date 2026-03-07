@@ -61,7 +61,7 @@ export class StartScene extends Phaser.Scene {
   private startGame() {
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
-      this.scene.start("GameScene");
+      this.scene.start("CharacterSelectScene");
     });
   }
 }
