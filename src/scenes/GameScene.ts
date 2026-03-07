@@ -2,7 +2,7 @@ import Phaser from "phaser";
 
 const TILE = 70;
 const GROUND_TOP = 720 - 64;
-const LEVEL_WIDTH = 3840;
+const LEVEL_WIDTH = 7680;
 
 type BuildingStyle = "Beige" | "Dark" | "Gray";
 type RoofStyle = "Red" | "Grey";
@@ -319,7 +319,7 @@ export class GameScene extends Phaser.Scene {
       { key: "trucktank_trailer",  speed: 65,  damage: 3, scale: 5   },
       { key: "transport",          speed: 75,  damage: 3, scale: 5   },
     ];
-    const spacing = Math.floor((LEVEL_WIDTH * 3) / vehicles.length);
+    const spacing = Math.floor((LEVEL_WIDTH * 2) / vehicles.length);
     const carDefs = vehicles.map((v, i) => ({
       x: 600 + i * spacing,
       ...v,
