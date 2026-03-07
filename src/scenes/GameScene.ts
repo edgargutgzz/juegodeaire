@@ -63,7 +63,7 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`char_walk${i}`, `/assets/character/character_${gender}_walk${i}.png`);
     }
 
-    for (const car of ["sedan", "sedan-sports", "suv", "taxi", "hatchback-sports", "van"]) {
+    for (const car of ["sedan", "sedan_blue", "taxi", "suv", "sports_red", "sports_green", "rounded_yellow", "van"]) {
       this.load.image(`car_${car}`, `/assets/cars/${car}.png`);
     }
 
@@ -258,18 +258,20 @@ export class GameScene extends Phaser.Scene {
 
   private makeCars() {
     const carDefs = [
-      { x: 380,  key: "car_sedan",           speed: 120, dir: 1  },
-      { x: 900,  key: "car_taxi",             speed: 90,  dir: -1 },
-      { x: 1300, key: "car_suv",              speed: 150, dir: 1  },
-      { x: 2000, key: "car_sedan-sports",     speed: 200, dir: 1  },
-      { x: 2600, key: "car_hatchback-sports", speed: 110, dir: -1 },
-      { x: 3200, key: "car_van",              speed: 80,  dir: -1 },
+      { x: 380,  key: "car_sedan",          speed: 120, dir:  1 },
+      { x: 900,  key: "car_taxi",           speed: 90,  dir: -1 },
+      { x: 1300, key: "car_suv",            speed: 150, dir:  1 },
+      { x: 1900, key: "car_sports_red",     speed: 200, dir:  1 },
+      { x: 2400, key: "car_sedan_blue",     speed: 110, dir: -1 },
+      { x: 2900, key: "car_sports_green",   speed: 130, dir: -1 },
+      { x: 3300, key: "car_rounded_yellow", speed: 95,  dir:  1 },
+      { x: 3600, key: "car_van",            speed: 80,  dir: -1 },
     ];
 
     carDefs.forEach(({ x, key, speed, dir }, i) => {
-      const car = this.add.image(x, GROUND_TOP - 8, key)
+      const car = this.add.image(x, GROUND_TOP - 4, key)
         .setOrigin(0.5, 1)
-        .setScale(1.6)
+        .setScale(4)
         .setDepth(1)
         .setFlipX(dir === -1);
 
