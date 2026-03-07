@@ -301,8 +301,6 @@ export class GameScene extends Phaser.Scene {
       { key: "suv",                speed: 120, damage: 2, scale: 4   },
       { key: "suv_closed",         speed: 115, damage: 2, scale: 4   },
       { key: "suv_green",          speed: 110, damage: 2, scale: 4   },
-      { key: "suv_travel",         speed: 100, damage: 2, scale: 4   },
-      { key: "suv_military",       speed: 125, damage: 2, scale: 4   },
       { key: "suv_large",          speed: 110, damage: 2, scale: 4.5 },
       { key: "van",                speed: 100, damage: 2, scale: 4   },
       { key: "van_small",          speed: 105, damage: 2, scale: 4   },
