@@ -210,8 +210,7 @@ export class GameScene extends Phaser.Scene {
       if (entry.dir === 1 && entry.car.x > LEVEL_WIDTH + 100) entry.car.x = -100;
       if (entry.dir === -1 && entry.car.x < -100) entry.car.x = LEVEL_WIDTH + 100;
 
-      const exhaustOffset = entry.dir === 1 ? -48 : 48;
-      entry.emitter.setPosition(entry.car.x + exhaustOffset, GROUND_TOP - 30);
+      entry.emitter.setPosition(entry.car.x + 48, GROUND_TOP - 30);
 
       // Simple player overlap check
       if (!this.invincible && Math.abs(entry.car.x - this.player.x) < 50 && this.player.y > GROUND_TOP - 80) {
@@ -258,26 +257,27 @@ export class GameScene extends Phaser.Scene {
 
   private makeCars() {
     const carDefs = [
-      { x: 380,  key: "car_sedan",          speed: 120, dir:  1 },
-      { x: 900,  key: "car_taxi",           speed: 90,  dir: -1 },
-      { x: 1300, key: "car_suv",            speed: 150, dir:  1 },
-      { x: 1900, key: "car_sports_red",     speed: 200, dir:  1 },
-      { x: 2400, key: "car_sedan_blue",     speed: 110, dir: -1 },
-      { x: 2900, key: "car_sports_green",   speed: 130, dir: -1 },
-      { x: 3300, key: "car_rounded_yellow", speed: 95,  dir:  1 },
-      { x: 3600, key: "car_van",            speed: 80,  dir: -1 },
+      { x: 600,  key: "car_sedan",          speed: 120 },
+      { x: 1100, key: "car_taxi",           speed: 90  },
+      { x: 1600, key: "car_suv",            speed: 150 },
+      { x: 2100, key: "car_sports_red",     speed: 200 },
+      { x: 2600, key: "car_sedan_blue",     speed: 110 },
+      { x: 3000, key: "car_sports_green",   speed: 160 },
+      { x: 3300, key: "car_rounded_yellow", speed: 95  },
+      { x: 3700, key: "car_van",            speed: 80  },
     ];
 
-    carDefs.forEach(({ x, key, speed, dir }, i) => {
+    carDefs.forEach(({ x, key, speed }) => {
+      const dir = -1; // all cars come toward the player
       const car = this.add.image(x, GROUND_TOP - 4, key)
         .setOrigin(0.5, 1)
         .setScale(4)
         .setDepth(1)
-        .setFlipX(dir === -1);
+        .setFlipX(true);
 
-      const emitter = this.add.particles(x, GROUND_TOP - 30, "smog2", {
+      const emitter = this.add.particles(x + 48, GROUND_TOP - 30, "smog2", {
         speed: { min: 5, max: 25 },
-        angle: { min: 160, max: 200 },
+        angle: { min: -20, max: 20 },
         scale: { start: 0.5, end: 0.05 },
         alpha: { start: 0.9, end: 0 },
         lifespan: 1500,
@@ -286,17 +286,6 @@ export class GameScene extends Phaser.Scene {
       }).setDepth(1);
 
       this.carEmitters.push({ car, emitter, dir, speed });
-
-      if (i < 2) {
-        this.add.text(x, GROUND_TOP - 130, "fuente de\ncontaminación", {
-          fontSize: "13px", fontFamily: "monospace",
-          color: "#cc3300", align: "center",
-        }).setOrigin(0.5).setDepth(2);
-
-        const arrow = this.add.graphics().setDepth(2);
-        arrow.fillStyle(0xcc3300);
-        arrow.fillTriangle(x, GROUND_TOP - 108, x - 8, GROUND_TOP - 120, x + 8, GROUND_TOP - 120);
-      }
     });
   }
 
