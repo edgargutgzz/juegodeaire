@@ -1,49 +1,9 @@
 import Phaser from "phaser";
 
-const TILE = 70;
-const GROUND_TOP = 720 - 64;
+const SIDEWALK_Y = 630;   // superficie de la banqueta (jugador camina aquí)
+const ROAD_Y     = 690;   // superficie de la calle (carros van aquí)
 const LEVEL_WIDTH = 7680;
 
-type BuildingStyle = "Beige" | "Dark" | "Gray";
-type RoofStyle = "Red" | "Grey";
-
-interface BuildingDef {
-  x: number;
-  tilesWide: number;
-  bodyRows: number;
-  style: BuildingStyle;
-  roof: RoofStyle;
-  awning?: "Green" | "Red";
-  chimney?: boolean;
-}
-
-const BUILDINGS_TEMPLATE: BuildingDef[] = [
-  { x: 0,    tilesWide: 3, bodyRows: 3, style: "Gray",  roof: "Grey" },
-  { x: 210,  tilesWide: 2, bodyRows: 5, style: "Dark",  roof: "Red",  chimney: true },
-  { x: 360,  tilesWide: 4, bodyRows: 2, style: "Beige", roof: "Grey", awning: "Green" },
-  { x: 660,  tilesWide: 2, bodyRows: 6, style: "Gray",  roof: "Red",  chimney: true },
-  { x: 810,  tilesWide: 3, bodyRows: 4, style: "Dark",  roof: "Grey" },
-  { x: 1050, tilesWide: 2, bodyRows: 3, style: "Beige", roof: "Red",  awning: "Red" },
-  { x: 1190, tilesWide: 2, bodyRows: 5, style: "Gray",  roof: "Grey", chimney: true },
-  { x: 1400, tilesWide: 3, bodyRows: 4, style: "Beige", roof: "Red" },
-  { x: 1620, tilesWide: 2, bodyRows: 5, style: "Dark",  roof: "Grey", chimney: true },
-  { x: 1770, tilesWide: 4, bodyRows: 2, style: "Gray",  roof: "Red",  awning: "Green" },
-  { x: 2060, tilesWide: 2, bodyRows: 6, style: "Beige", roof: "Grey", chimney: true },
-  { x: 2210, tilesWide: 3, bodyRows: 3, style: "Dark",  roof: "Red",  awning: "Red" },
-  { x: 2430, tilesWide: 2, bodyRows: 4, style: "Gray",  roof: "Grey" },
-  { x: 2580, tilesWide: 4, bodyRows: 3, style: "Beige", roof: "Red",  chimney: true },
-  { x: 2880, tilesWide: 2, bodyRows: 5, style: "Dark",  roof: "Grey", awning: "Green" },
-  { x: 3030, tilesWide: 3, bodyRows: 4, style: "Gray",  roof: "Red" },
-  { x: 3240, tilesWide: 2, bodyRows: 6, style: "Beige", roof: "Grey", chimney: true },
-  { x: 3450, tilesWide: 3, bodyRows: 3, style: "Dark",  roof: "Red",  awning: "Red" },
-];
-
-// Tile buildings across the full level width
-const SECTION = 3840;
-const BUILDINGS: BuildingDef[] = Array.from(
-  { length: Math.ceil(7680 / SECTION) },
-  (_, repeat) => BUILDINGS_TEMPLATE.map(b => ({ ...b, x: b.x + repeat * SECTION }))
-).flat();
 
 export class GameScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -51,18 +11,19 @@ export class GameScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private pad: Phaser.Input.Gamepad.Gamepad | null = null;
   private invincible = false;
+  private pollutionAccum = 0;
   private levelComplete = false;
   private goalX = 0;
   private health = 5;
   private healthBar!: Phaser.GameObjects.Graphics;
-  private carEmitters: { car: Phaser.GameObjects.Image; emitter: Phaser.GameObjects.Particles.ParticleEmitter; dir: number; speed: number; damage: number }[] = [];
+  private carEmitters: { car: Phaser.GameObjects.Image; emitter: Phaser.GameObjects.Particles.ParticleEmitter; dir: number; speed: number; damage: number; scale: number }[] = [];
 
   constructor() {
     super("GameScene");
   }
 
   preload() {
-    const gender = (this.registry.get("character") as string) === "female" ? "femaleAdventurer" : "maleAdventurer";
+    const gender = "maleAdventurer";
     this.load.image("char_idle", `/assets/character/character_${gender}_idle.png`);
     this.load.image("char_jump", `/assets/character/character_${gender}_jump.png`);
     this.load.image("char_fall", `/assets/character/character_${gender}_fall.png`);
@@ -79,71 +40,83 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`car_${v}`, `/assets/cars/${v}.png`);
     }
 
-    const buildingKeys = [
-      "houseBeige", "houseBeigeAlt", "houseBeigeAlt2",
-      "houseBeigeTopLeft", "houseBeigeTopMid", "houseBeigeTopRight",
-      "houseBeigeMidLeft", "houseBeigeMidRight",
-      "houseBeigeBottomLeft", "houseBeigeBottomMid", "houseBeigeBottomRight",
-      "houseDark", "houseDarkAlt", "houseDarkAlt2",
-      "houseDarkTopLeft", "houseDarkTopMid", "houseDarkTopRight",
-      "houseDarkMidLeft", "houseDarkMidRight",
-      "houseDarkBottomLeft", "houseDarkBottomMid", "houseDarkBottomRight",
-      "houseGray", "houseGrayAlt", "houseGrayAlt2",
-      "houseGrayTopLeft", "houseGrayTopMid", "houseGrayTopRight",
-      "houseGrayMidLeft", "houseGrayMidRight",
-      "houseGrayBottomLeft", "houseGrayBottomMid", "houseGrayBottomRight",
-      "roofRedLeft", "roofRedMid", "roofRedRight",
-      "roofRedTopLeft", "roofRedTopMid", "roofRedTopRight",
-      "roofGreyLeft", "roofGreyMid", "roofGreyRight",
-      "roofGreyTopLeft", "roofGreyTopMid", "roofGreyTopRight",
-      "chimneyThin",
-      "awningGreen", "awningRed",
-    ];
-    for (const key of buildingKeys) {
-      this.load.image(key, `/assets/buildings/${key}.png`);
+    for (let i = 0; i <= 8; i += 2) {
+      const n = String(i).padStart(2, "0");
+      this.load.image(`whitePuff${n}`, `/assets/smoke/whitePuff${n}.png`);
+      if (i <= 6) this.load.image(`blackSmoke${n}`, `/assets/smoke/blackSmoke${n}.png`);
     }
   }
 
   create() {
     this.levelComplete = false;
+    this.invincible = false;
+    this.pollutionAccum = 0;
+    this.carEmitters = [];
 
     // World bounds
     this.physics.world.setBounds(0, 0, LEVEL_WIDTH, 720);
 
-    // Sky
-    this.add.rectangle(LEVEL_WIDTH / 2, 360, LEVEL_WIDTH, 720, 0xc8d8e0).setDepth(-2);
-    this.add.rectangle(LEVEL_WIDTH / 2, 500, LEVEL_WIDTH, 440, 0xb0b8a8, 0.25).setDepth(-1);
+    // ── Calle (asfalto) ─────────────────────────────────────────────
+    this.add.rectangle(LEVEL_WIDTH / 2, (ROAD_Y + 720) / 2, LEVEL_WIDTH, 720 - ROAD_Y + 60, 0x2e2e2e).setDepth(-0.5);
 
-    // Buildings
-    for (const def of BUILDINGS) {
-      this.createBuilding(def);
+    // Marcas viales
+    const roadG = this.add.graphics().setDepth(0);
+    const dashLen = 48, dashGap = 64;
+    const laneY = ROAD_Y + 12;
+    roadG.fillStyle(0xffffff, 0.6);
+    for (let x = 0; x < LEVEL_WIDTH; x += dashLen + dashGap) roadG.fillRect(x, laneY, dashLen, 4);
+
+    // ── Banqueta (plataforma del jugador) ───────────────────────────
+    // Base: concreto beige-gris cálido
+    this.add.rectangle(LEVEL_WIDTH / 2, SIDEWALK_Y + 20, LEVEL_WIDTH, 40, 0xc4bba8).setDepth(0.5);
+
+    // Franja clara en el tope (luz ambiente)
+    this.add.rectangle(LEVEL_WIDTH / 2, SIDEWALK_Y + 1, LEVEL_WIDTH, 3, 0xd8d0bc).setDepth(0.6);
+
+    // Franja oscura en la parte baja (sombra interna)
+    this.add.rectangle(LEVEL_WIDTH / 2, SIDEWALK_Y + 34, LEVEL_WIDTH, 6, 0xb0a898).setDepth(0.6);
+
+    // Juntas de losetas (líneas verticales cada 88px)
+    const sidewalkG = this.add.graphics().setDepth(0.7);
+    sidewalkG.lineStyle(1, 0xa09888, 0.6);
+    for (let x = 44; x < LEVEL_WIDTH; x += 88) {
+      sidewalkG.beginPath();
+      sidewalkG.moveTo(x, SIDEWALK_Y + 4);
+      sidewalkG.lineTo(x, SIDEWALK_Y + 34);
+      sidewalkG.strokePath();
     }
 
-    // Ground texture
-    const canvas = document.createElement("canvas");
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#7a7a7a";
-    ctx.fillRect(0, 0, 64, 64);
-    ctx.fillStyle = "#666666";
-    ctx.fillRect(0, 0, 64, 4);
-    this.textures.addCanvas("ground", canvas);
+    // Curb (bordillo): borde grueso oscuro al fondo de la banqueta
+    this.add.rectangle(LEVEL_WIDTH / 2, SIDEWALK_Y + 41, LEVEL_WIDTH, 6, 0x7a7060).setDepth(0.8);
+    // Línea de sombra del curb
+    this.add.rectangle(LEVEL_WIDTH / 2, SIDEWALK_Y + 46, LEVEL_WIDTH, 3, 0x5a5048).setDepth(0.8);
 
-    // Ground across full level
+    // Física: plataforma invisible en la banqueta
+    const canvas = document.createElement("canvas");
+    canvas.width = 64; canvas.height = 40;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#aaaaaa";
+    ctx.fillRect(0, 0, 64, 40);
+    this.textures.addCanvas("sidewalk", canvas);
+
     this.platforms = this.physics.add.staticGroup();
     for (let x = 0; x < LEVEL_WIDTH; x += 64) {
-      this.platforms.create(x + 32, 720 - 32, "ground");
+      this.platforms.create(x + 32, SIDEWALK_Y + 28, "sidewalk").setAlpha(0);
     }
 
     // Goal zone
     this.createGoal(LEVEL_WIDTH - 120);
 
-    // Player
-    this.player = this.physics.add.sprite(100, 500, "char_idle");
+    // Player — empieza sobre la banqueta
+    this.player = this.physics.add.sprite(100, SIDEWALK_Y - 60, "char_idle");
     this.player.setCollideWorldBounds(true);
     this.player.setScale(0.5);
-    this.player.setDepth(1);
+    this.player.setDepth(3);
+    // Trim physics body to exclude transparent bottom padding in sprite (~20px in 128px source = 10px at scale 0.5)
+    // so the visual feet land exactly on the sidewalk surface
+    const body = this.player.body as Phaser.Physics.Arcade.Body;
+    body.setSize(this.player.width, this.player.height - 20);
+    body.setOffset(0, 0);
 
     this.anims.create({
       key: "walk",
@@ -153,8 +126,6 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.physics.add.collider(this.player, this.platforms);
-
-    this.makeCircleTexture("smog2", 16, 0x556b2f, 1);
 
     // Cars
     this.makeCars();
@@ -166,8 +137,8 @@ export class GameScene extends Phaser.Scene {
 
     // Health bar (fixed to camera)
     this.health = 10;
-    this.add.text(20, 6, "AIR", {
-      fontSize: "12px", fontFamily: "monospace", color: "#ffffff",
+    this.add.text(20, 40, "AIRE", {
+      fontSize: "12px", fontFamily: "'Press Start 2P'", color: "#ffffff",
     }).setScrollFactor(0).setDepth(10);
     this.healthBar = this.add.graphics().setScrollFactor(0).setDepth(10);
     this.drawHealthBar();
@@ -221,13 +192,22 @@ export class GameScene extends Phaser.Scene {
       if (entry.dir === 1 && entry.car.x > LEVEL_WIDTH + 100) entry.car.x = -100;
       if (entry.dir === -1 && entry.car.x < -100) entry.car.x = LEVEL_WIDTH + 100;
 
-      entry.emitter.setPosition(entry.car.x + 48, GROUND_TOP - 30);
+      entry.emitter.setPosition(entry.car.x - entry.dir * entry.scale * 20, ROAD_Y - 30);
 
-      // Hit detection scaled to vehicle size
-      const hitRange = entry.damage === 3 ? 70 : entry.damage === 2 ? 55 : 40;
-      if (!this.invincible && Math.abs(entry.car.x - this.player.x) < hitRange && this.player.y > GROUND_TOP - 80) {
-        this.onHit(entry.damage);
+      // Proximity-based pollution damage: accumulate per frame
+      const proximityRange = entry.damage === 3 ? 320 : entry.damage === 2 ? 240 : 180;
+      const dist = Math.abs(entry.car.x - this.player.x);
+      if (dist < proximityRange) {
+        const intensity = 1 - dist / proximityRange;
+        this.pollutionAccum += intensity * entry.damage * delta;
       }
+    }
+
+    // Apply accumulated pollution damage once per threshold
+    if (!this.invincible && this.pollutionAccum >= 0.6) {
+      const dmg = Math.floor(this.pollutionAccum);
+      this.pollutionAccum -= dmg;
+      this.onHit(dmg);
     }
 
     if (!onGround) {
@@ -242,16 +222,18 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+
   private createGoal(x: number) {
     this.goalX = x;
 
-    const glow = this.add.rectangle(x + 40, GROUND_TOP - 80, 80, 160, 0x44ff88, 0.35).setDepth(1);
-    this.add.rectangle(x + 40, GROUND_TOP - 80, 6, 160, 0x22cc66).setDepth(1);
+    const goalCenterY = SIDEWALK_Y - 80;
+    const glow = this.add.rectangle(x + 40, goalCenterY, 80, 160, 0x44ff88, 0.35).setDepth(1);
+    this.add.rectangle(x + 40, goalCenterY, 6, 160, 0x22cc66).setDepth(1);
     this.tweens.add({ targets: glow, alpha: 0.1, duration: 800, yoyo: true, repeat: -1 });
 
-    this.add.text(x + 40, GROUND_TOP - 180, "FINISH", {
+    this.add.text(x + 40, SIDEWALK_Y - 180, "META", {
       fontSize: "20px",
-      fontFamily: "monospace",
+      fontFamily: "'Press Start 2P'",
       color: "#22cc66",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(1);
@@ -287,32 +269,48 @@ export class GameScene extends Phaser.Scene {
       { key: "bus",          speed: 80,  damage: 3, scale: 4.5 },
       { key: "firetruck",    speed: 95,  damage: 3, scale: 4.5 },
     ];
-    const spacing = Math.floor((LEVEL_WIDTH * 2) / vehicles.length);
-    const carDefs = vehicles.map((v, i) => ({
-      x: 600 + i * spacing,
-      ...v,
-      key: `car_${v.key}`,
-    }));
+    // Shuffle the base list so types are mixed
+    const pool = [...vehicles];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    // Space each car by its width + a fixed gap so none overlap
+    const GAP = 120;
+    const carDefs: { x: number; key: string; speed: number; damage: number; scale: number }[] = [];
+    let nextX = 600;
+    for (const v of pool) {
+      const carWidth = v.scale * 80;
+      carDefs.push({ x: nextX + carWidth / 2, ...v, key: `car_${v.key}` });
+      nextX += carWidth + GAP;
+    }
 
     carDefs.forEach(({ x, key, speed, damage, scale }) => {
       const dir = -1;
-      const car = this.add.image(x, GROUND_TOP - 4, key)
+      const car = this.add.image(x, ROAD_Y, key)
         .setOrigin(0.5, 1)
         .setScale(scale)
         .setDepth(1)
         .setFlipX(true);
 
-      const emitter = this.add.particles(x + scale * 8, GROUND_TOP - 30, "smog2", {
-        speed: { min: 5, max: 25 },
-        angle: { min: -20, max: 20 },
-        scale: { start: 0.5, end: 0.05 },
-        alpha: { start: 0.9, end: 0 },
-        lifespan: 1500,
-        frequency: 300,
-        gravityY: -40,
-      }).setDepth(1);
+      const isLarge = damage >= 3;
+      const smokeFrames = isLarge
+        ? ["blackSmoke00", "blackSmoke02", "blackSmoke04", "blackSmoke06"]
+        : ["whitePuff00", "whitePuff02", "whitePuff04", "whitePuff06", "whitePuff08"];
 
-      this.carEmitters.push({ car, emitter, dir, speed, damage });
+      const emitter = this.add.particles(x - scale * 20, ROAD_Y - 30, smokeFrames[0], {
+        frame: smokeFrames,
+        speed: { min: 8, max: 30 },
+        angle: { min: 250, max: 290 },
+        scale: { start: 0.18, end: 0.32 },
+        alpha: { start: 0.7, end: 0 },
+        lifespan: 1800,
+        frequency: 250,
+        gravityY: -30,
+        tint: isLarge ? 0x555555 : 0xb87a3a,
+      }).setDepth(1.5);
+
+      this.carEmitters.push({ car, emitter, dir, speed, damage, scale });
     });
   }
 
@@ -321,20 +319,21 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(20);
 
     const title = this.add.text(640, 310, "NIVEL 1: EL TRÁFICO", {
-      fontSize: "26px", fontFamily: "monospace", color: "#ffffff", fontStyle: "bold",
+      fontSize: "26px", fontFamily: "'Press Start 2P'", color: "#ffffff", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
     const subtitle = this.add.text(640, 355, "Los autos queman combustible y\nliberan gases contaminantes al aire.", {
-      fontSize: "17px", fontFamily: "monospace", color: "#cccccc", align: "center",
+      fontSize: "17px", fontFamily: "'Press Start 2P'", color: "#cccccc", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
     const hint = this.add.text(640, 410, "— presiona cualquier tecla para comenzar —", {
-      fontSize: "13px", fontFamily: "monospace", color: "#aaaaaa",
+      fontSize: "13px", fontFamily: "'Press Start 2P'", color: "#aaaaaa",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
     this.tweens.add({ targets: hint, alpha: 0, duration: 500, yoyo: true, repeat: -1 });
 
     this.levelComplete = true;
+    this.carEmitters.forEach(e => e.emitter.stop());
 
     const dismiss = () => {
       this.tweens.killTweensOf(hint);
@@ -345,6 +344,7 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => {
           bg.destroy(); title.destroy(); subtitle.destroy(); hint.destroy();
           this.levelComplete = false;
+          this.carEmitters.forEach(e => e.emitter.start());
         },
       });
       this.input.keyboard!.off("keydown", dismiss);
@@ -353,15 +353,6 @@ export class GameScene extends Phaser.Scene {
 
     this.input.keyboard!.once("keydown", dismiss);
     this.input.gamepad!.once("down", dismiss);
-  }
-
-  private makeCircleTexture(key: string, radius: number, color: number, alpha: number) {
-    const size = radius * 2;
-    const g = this.make.graphics() as Phaser.GameObjects.Graphics;
-    g.fillStyle(color, alpha);
-    g.fillCircle(radius, radius, radius);
-    g.generateTexture(key, size, size);
-    g.destroy();
   }
 
   private onHit(damage = 1) {
@@ -389,7 +380,7 @@ export class GameScene extends Phaser.Scene {
 
   private drawHealthBar() {
     const barX = 20;
-    const barY = 20;
+    const barY = 58;
     const barW = 200;
     const barH = 18;
 
@@ -410,49 +401,4 @@ export class GameScene extends Phaser.Scene {
     this.healthBar.strokeRect(barX, barY, barW, barH);
   }
 
-  private createBuilding(def: BuildingDef) {
-    const { x, tilesWide, bodyRows, style, roof, awning, chimney } = def;
-    const totalRows = 2 + 1 + bodyRows + 1;
-    const startY = GROUND_TOP - totalRows * TILE;
-
-    const place = (col: number, row: number, key: string) => {
-      this.add.image(x + col * TILE, startY + row * TILE, key).setOrigin(0, 0).setDepth(0);
-    };
-
-    const midFill = [`house${style}`, `house${style}Alt`, `house${style}Alt2`];
-
-    place(0, 0, `roof${roof}TopLeft`);
-    for (let c = 1; c < tilesWide - 1; c++) place(c, 0, `roof${roof}TopMid`);
-    place(tilesWide - 1, 0, `roof${roof}TopRight`);
-
-    place(0, 1, `roof${roof}Left`);
-    for (let c = 1; c < tilesWide - 1; c++) place(c, 1, `roof${roof}Mid`);
-    place(tilesWide - 1, 1, `roof${roof}Right`);
-
-    place(0, 2, `house${style}TopLeft`);
-    for (let c = 1; c < tilesWide - 1; c++) place(c, 2, `house${style}TopMid`);
-    place(tilesWide - 1, 2, `house${style}TopRight`);
-
-    for (let r = 0; r < bodyRows; r++) {
-      const row = 3 + r;
-      place(0, row, `house${style}MidLeft`);
-      for (let c = 1; c < tilesWide - 1; c++) place(c, row, midFill[r % midFill.length]);
-      place(tilesWide - 1, row, `house${style}MidRight`);
-    }
-
-    const lastRow = 3 + bodyRows;
-    place(0, lastRow, `house${style}BottomLeft`);
-    for (let c = 1; c < tilesWide - 1; c++) place(c, lastRow, `house${style}BottomMid`);
-    place(tilesWide - 1, lastRow, `house${style}BottomRight`);
-
-    if (chimney) {
-      this.add.image(x + TILE * (tilesWide - 1), startY - TILE, "chimneyThin").setOrigin(0, 0).setDepth(0);
-    }
-
-    if (awning) {
-      for (let c = 0; c < tilesWide; c++) {
-        this.add.image(x + c * TILE, GROUND_TOP - TILE, `awning${awning}`).setOrigin(0, 0).setDepth(0);
-      }
-    }
-  }
 }
