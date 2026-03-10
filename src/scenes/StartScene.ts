@@ -29,22 +29,23 @@ export class StartScene extends Phaser.Scene {
     overlay.fillStyle(0x000000, 0.40);
     overlay.fillRect(0, 0, W, H);
 
-    // ── Subtítulo ─────────────────────────────────────────────────
-    this.add.text(W/2, H*0.08, "¿Puedes escapar de la contaminación?", {
-      fontSize: "18px", fontFamily: "'Bungee'", color: "#c8c8c8",
-      stroke: "#000000", strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(9);
-
     // ── Título ────────────────────────────────────────────────────
-    this.add.text(W / 2, H * 0.42, "NO SE VEN LAS MONTAÑAS", {
-      fontSize: "56px", fontFamily: "'Bungee'",
+    this.add.text(W / 2, H * 0.28, "NO SE VEN LAS\nMONTAÑAS", {
+      fontSize: "44px", fontFamily: "'Press Start 2P'",
       color: "#ffffff", stroke: "#000000", strokeThickness: 5,
+      align: "center", lineSpacing: 12,
+    }).setOrigin(0.5).setDepth(5);
+
+    // ── Subtítulo ─────────────────────────────────────────────────
+    this.add.text(W / 2, H * 0.48, "¿Puedes escapar de la contaminación?", {
+      fontSize: "16px", fontFamily: "'Press Start 2P'",
+      color: "#e8720c", stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(5);
 
     // ── Prompt parpadeante ────────────────────────────────────────
-    const prompt = this.add.text(W / 2, H * 0.65, "Presiona para iniciar", {
-      fontSize: "20px", fontFamily: "'Bungee'",
-      color: "#e8720c", stroke: "#000000", strokeThickness: 5,
+    const prompt = this.add.text(W / 2, H * 0.64, "PRESIONA PARA INICIAR", {
+      fontSize: "12px", fontFamily: "'Press Start 2P'",
+      color: "#ffffff", stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0.5).setDepth(5);
 
     this.tweens.add({
