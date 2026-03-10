@@ -4,11 +4,11 @@ import { GameScene } from "./scenes/GameScene";
 import { LevelCompleteScene } from "./scenes/LevelCompleteScene";
 import { GameOverScene } from "./scenes/GameOverScene";
 
-new Phaser.Game({
+const startGame = () => new Phaser.Game({
   type: Phaser.AUTO,
   width: 1280,
   height: 720,
-  backgroundColor: "#c8d8e0",
+  backgroundColor: "#64b4e6",
   render: {
     resolution: window.devicePixelRatio ?? 1,
   },
@@ -28,3 +28,5 @@ new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
 });
+
+document.fonts.ready.then(startGame);
