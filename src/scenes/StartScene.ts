@@ -38,13 +38,13 @@ export class StartScene extends Phaser.Scene {
     // ── Título ────────────────────────────────────────────────────
     this.add.text(W / 2, H * 0.42, "NO SE VEN LAS MONTAÑAS", {
       fontSize: "56px", fontFamily: "'Bungee'",
-      color: "#e8720c", stroke: "#000000", strokeThickness: 5,
+      color: "#ffffff", stroke: "#000000", strokeThickness: 5,
     }).setOrigin(0.5).setDepth(5);
 
     // ── Prompt parpadeante ────────────────────────────────────────
     const prompt = this.add.text(W / 2, H * 0.65, "Presiona para iniciar", {
       fontSize: "20px", fontFamily: "'Bungee'",
-      color: "#ffffff", stroke: "#000000", strokeThickness: 5,
+      color: "#e8720c", stroke: "#000000", strokeThickness: 5,
     }).setOrigin(0.5).setDepth(5);
 
     this.tweens.add({
