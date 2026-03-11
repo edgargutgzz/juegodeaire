@@ -46,7 +46,7 @@ export class StartScene extends Phaser.Scene {
 
     // ── Prompt parpadeante ────────────────────────────────────────
     const prompt = this.add.text(W / 2, H * 0.58, "PRESIONA PARA INICIAR", {
-      fontSize: "12px", fontFamily: "'Press Start 2P'",
+      fontSize: "10px", fontFamily: "'Press Start 2P'",
       color: "#ffffff", stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0.5).setDepth(5);
 
