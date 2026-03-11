@@ -44,7 +44,7 @@ export class StartScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(5);
 
     // ── Prompt parpadeante ────────────────────────────────────────
-    const prompt = this.add.text(W / 2, H * 0.64, "PRESIONA PARA INICIAR", {
+    const prompt = this.add.text(W / 2, H * 0.57, "PRESIONA PARA INICIAR", {
       fontSize: "12px", fontFamily: "'Press Start 2P'",
       color: "#ffffff", stroke: "#000000", strokeThickness: 2,
     }).setOrigin(0.5).setDepth(5);
@@ -99,7 +99,7 @@ const drawMask = (g: Phaser.GameObjects.Graphics) => {
       drawAccessory: (g: Phaser.GameObjects.Graphics) => void
     ) => {
       const gender = animKey.split("_")[1];
-      const charY = H - 130;
+      const charY = H - 170;
 
       const container = this.add.container(-60, charY).setDepth(depth);
       const sprite = this.add.sprite(0, 0, `${gender}_walk0`).setScale(0.75).setOrigin(0.5, 1);
