@@ -34,6 +34,7 @@ export class StartScene extends Phaser.Scene {
       fontSize: "28px", fontFamily: "'Press Start 2P'",
       color: "#ffffff", stroke: "#000000", strokeThickness: 5,
       align: "center", lineSpacing: 12,
+      padding: { left: 24, right: 24 },
     }).setOrigin(0.5).setDepth(5);
 
     // ── Subtítulo ─────────────────────────────────────────────────
@@ -98,7 +99,7 @@ const drawMask = (g: Phaser.GameObjects.Graphics) => {
       drawAccessory: (g: Phaser.GameObjects.Graphics) => void
     ) => {
       const gender = animKey.split("_")[1];
-      const charY = H - 55;
+      const charY = H - 200;
 
       const container = this.add.container(-60, charY).setDepth(depth);
       const sprite = this.add.sprite(0, 0, `${gender}_walk0`).setScale(0.75).setOrigin(0.5, 1);
