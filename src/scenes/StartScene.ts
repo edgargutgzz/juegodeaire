@@ -101,7 +101,7 @@ const drawMask = (g: Phaser.GameObjects.Graphics) => {
       const charY = H - 55;
 
       const container = this.add.container(-60, charY).setDepth(depth);
-      const sprite = this.add.sprite(0, 0, `${gender}_walk0`).setScale(0.5).setOrigin(0.5, 1);
+      const sprite = this.add.sprite(0, 0, `${gender}_walk0`).setScale(0.75).setOrigin(0.5, 1);
       const accessory = this.add.graphics();
       drawAccessory(accessory);
       container.add([sprite, accessory]);
@@ -144,9 +144,9 @@ const drawMask = (g: Phaser.GameObjects.Graphics) => {
       this.time.delayedCall(delay, run);
     };
 
-    spawnRunner("run_female", "female_idle", W * 0.32, 10, 0, drawMask);
-    spawnRunner("run_male",   "male_idle",   W * 0.24, 10,
-      Math.round((W * 0.08) / (W + 120) * 5000), () => {});
+    spawnRunner("run_female", "female_idle", W * 0.55, 10, 0, drawMask);
+    spawnRunner("run_male",   "male_idle",   W * 0.40, 10,
+      Math.round((W * 0.15) / (W + 120) * 5000), () => {});
 
     // ── Música ────────────────────────────────────────────────────
     this.sound.add("music_start", { loop: true, volume: 0.5 }).play();
