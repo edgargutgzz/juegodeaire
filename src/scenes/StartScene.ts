@@ -31,7 +31,7 @@ export class StartScene extends Phaser.Scene {
 
     // ── Título ────────────────────────────────────────────────────
     this.add.text(W / 2, H * 0.28, "NO SE VEN\nLAS MONTAÑAS", {
-      fontSize: "26px", fontFamily: "'Press Start 2P'",
+      fontSize: "22px", fontFamily: "'Press Start 2P'",
       color: "#ffffff", stroke: "#000000", strokeThickness: 5,
       align: "center", lineSpacing: 12,
       wordWrap: { width: W - 48 },
@@ -39,7 +39,7 @@ export class StartScene extends Phaser.Scene {
 
     // ── Subtítulo ─────────────────────────────────────────────────
     this.add.text(W / 2, H * 0.40, "Corre. Respira.\nSobrevive.", {
-      fontSize: "14px", fontFamily: "'Press Start 2P'",
+      fontSize: "12px", fontFamily: "'Press Start 2P'",
       color: "#e8720c", stroke: "#000000", strokeThickness: 3,
       align: "center", lineSpacing: 10,
     }).setOrigin(0.5).setDepth(5);
