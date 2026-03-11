@@ -38,9 +38,10 @@ export class StartScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(5);
 
     // ── Subtítulo ─────────────────────────────────────────────────
-    this.add.text(W / 2, H * 0.40, "Corre. Respira. Sobrevive.", {
+    this.add.text(W / 2, H * 0.40, "Corre. Respira.\nSobrevive.", {
       fontSize: "14px", fontFamily: "'Press Start 2P'",
       color: "#e8720c", stroke: "#000000", strokeThickness: 3,
+      align: "center",
     }).setOrigin(0.5).setDepth(5);
 
     // ── Prompt parpadeante ────────────────────────────────────────
@@ -67,7 +68,7 @@ export class StartScene extends Phaser.Scene {
     });
 
 const drawMask = (g: Phaser.GameObjects.Graphics) => {
-      const mx = 0, my = -24;
+      const mx = 0, my = -38;
       // Cuerpo del cubrebocas (forma trapezoidal)
       g.fillStyle(0xffffff, 0.95);
       g.fillPoints([
@@ -147,7 +148,7 @@ const drawMask = (g: Phaser.GameObjects.Graphics) => {
 
     spawnRunner("run_female", "female_idle", W * 0.55, 10, 0, drawMask);
     spawnRunner("run_male",   "male_idle",   W * 0.40, 10,
-      Math.round((W * 0.15) / (W + 120) * 5000), () => {});
+      Math.round((W * 0.15) / (W + 120) * 5000), drawMask);
 
     // ── Música ────────────────────────────────────────────────────
     this.sound.add("music_start", { loop: true, volume: 0.5 }).play();
