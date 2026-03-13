@@ -16,6 +16,7 @@ export class GameScene extends Phaser.Scene {
   private goalX = 0;
   private health = 5;
   private healthBar!: Phaser.GameObjects.Graphics;
+  private difficultyMultiplier = 1;
   private carEmitters: { car: Phaser.GameObjects.Image; emitter: Phaser.GameObjects.Particles.ParticleEmitter; dir: number; speed: number; damage: number; scale: number }[] = [];
 
   constructor() {
@@ -23,12 +24,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    const gender = "maleAdventurer";
-    this.load.image("char_idle", `/assets/character/character_${gender}_idle.png`);
-    this.load.image("char_jump", `/assets/character/character_${gender}_jump.png`);
-    this.load.image("char_fall", `/assets/character/character_${gender}_fall.png`);
+    const character = this.registry.get("character") || "maleAdventurer";
+    this.load.image("char_idle", `/assets/character/character_${character}_idle.png`);
+    this.load.image("char_jump", `/assets/character/character_${character}_jump.png`);
+    this.load.image("char_fall", `/assets/character/character_${character}_fall.png`);
     for (let i = 0; i < 8; i++) {
-      this.load.image(`char_walk${i}`, `/assets/character/character_${gender}_walk${i}.png`);
+      this.load.image(`char_walk${i}`, `/assets/character/character_${character}_walk${i}.png`);
     }
 
     const allVehicles = [
@@ -52,6 +53,7 @@ export class GameScene extends Phaser.Scene {
     this.invincible = false;
     this.pollutionAccum = 0;
     this.carEmitters = [];
+    this.difficultyMultiplier = this.registry.get("difficulty") === "hard" ? 2 : 1;
 
     // World bounds
     this.physics.world.setBounds(0, 0, LEVEL_WIDTH, 720);
@@ -199,7 +201,7 @@ export class GameScene extends Phaser.Scene {
       const dist = Math.abs(entry.car.x - this.player.x);
       if (dist < proximityRange) {
         const intensity = 1 - dist / proximityRange;
-        this.pollutionAccum += intensity * entry.damage * delta;
+        this.pollutionAccum += intensity * entry.damage * delta * this.difficultyMultiplier;
       }
     }
 
