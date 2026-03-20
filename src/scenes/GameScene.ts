@@ -22,7 +22,6 @@ export class GameScene extends Phaser.Scene {
   private health = 10;
   private healthBar!: Phaser.GameObjects.Graphics;
   private difficultyMultiplier = 1;
-  private spawnTimer!: Phaser.Time.TimerEvent;
 
   constructor() {
     super("GameScene");
@@ -358,7 +357,7 @@ export class GameScene extends Phaser.Scene {
     this.waveIndex = 0;
     // Esperar a que el jugador aterrice antes de empezar
     this.time.delayedCall(2500, () => {
-      this.spawnTimer = this.time.addEvent({
+      this.time.addEvent({
         delay: 2200,
         loop: true,
         callback: () => {
@@ -387,7 +386,7 @@ export class GameScene extends Phaser.Scene {
     const speed  = isLow ? -260 : isHigh ? -320 : -290;
 
     const key = `proj_${Date.now()}_${Math.random()}`;
-    const gfx = this.make.graphics({ x: 0, y: 0, add: false });
+    const gfx = this.make.graphics({ x: 0, y: 0 });
     gfx.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(35).color, 1);
     gfx.fillCircle(radius, radius, radius);
     gfx.fillStyle(color, 1);
