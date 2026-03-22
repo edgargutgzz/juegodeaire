@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { StartScene } from "./scenes/StartScene";
-import { CharacterSelectScene } from "./scenes/CharacterSelectScene";
 import { GameScene } from "./scenes/GameScene";
+import { BossScene } from "./scenes/BossScene";
 import { LevelCompleteScene } from "./scenes/LevelCompleteScene";
 import { GameOverScene } from "./scenes/GameOverScene";
 
@@ -9,6 +9,11 @@ const startGame = () => new Phaser.Game({
   type: Phaser.AUTO,
   width: 1280,
   height: 720,
+  render: {
+    antialias: true,
+    antialiasGL: true,
+    pixelArt: false,
+  },
   backgroundColor: "#64b4e6",
   input: {
     gamepad: true,
@@ -20,7 +25,7 @@ const startGame = () => new Phaser.Game({
       debug: false,
     },
   },
-  scene: [StartScene, CharacterSelectScene, GameScene, LevelCompleteScene, GameOverScene],
+  scene: [StartScene, GameScene, BossScene, LevelCompleteScene, GameOverScene],
   scale: {
     mode: Phaser.Scale.ENVELOP,
     autoCenter: Phaser.Scale.CENTER_BOTH,
