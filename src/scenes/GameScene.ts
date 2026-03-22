@@ -47,7 +47,6 @@ export class GameScene extends Phaser.Scene {
   private scoreText!:     Phaser.GameObjects.Text;
   private distancePeak    = 0;
 
-  private spawnTimer!:    Phaser.Time.TimerEvent;
   private waveIndex       = 0;
   private bgCars:         Phaser.GameObjects.Image[] = [];
   private checkpointsPassed = new Set<number>();
@@ -365,7 +364,7 @@ export class GameScene extends Phaser.Scene {
       const angle = (i / 8) * Math.PI * 2;
       const speed = Phaser.Math.Between(60, 140);
       const key   = `ptcl_${Date.now()}_${i}`;
-      const gfx   = this.make.graphics({ x: 0, y: 0, add: false });
+      const gfx   = this.make.graphics({ x: 0, y: 0 } as any);
       gfx.fillStyle(colors[i % colors.length], 1);
       gfx.fillCircle(4, 4, 4);
       gfx.generateTexture(key, 8, 8);
@@ -610,7 +609,7 @@ export class GameScene extends Phaser.Scene {
 
   private startPollutionSpawner() {
     const scheduleNext = () => {
-      this.spawnTimer = this.time.addEvent({
+      this.time.addEvent({
         delay: this.spawnDelay,
         callback: () => {
           if (!this.levelComplete) {
@@ -639,7 +638,7 @@ export class GameScene extends Phaser.Scene {
     const speed   = baseSpd * this.projSpeedMult;
 
     const key = `proj_${Date.now()}_${Math.random()}`;
-    const gfx = this.make.graphics({ x: 0, y: 0, add: false });
+    const gfx = this.make.graphics({ x: 0, y: 0 } as any);
     gfx.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(35).color, 1);
     gfx.fillCircle(radius, radius, radius);
     gfx.fillStyle(color, 1);
@@ -754,7 +753,7 @@ export class GameScene extends Phaser.Scene {
     const y = SIDEWALK_Y - 48;
     const key = `mask_${x}`;
 
-    const gfx = this.make.graphics({ x: 0, y: 0, add: false });
+    const gfx = this.make.graphics({ x: 0, y: 0 } as any);
     // Mask body (white with light blue tint)
     gfx.fillStyle(0xe8f4ff, 1);
     gfx.fillRoundedRect(2, 8, 44, 28, 6);
