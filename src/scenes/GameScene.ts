@@ -32,9 +32,6 @@ export class GameScene extends Phaser.Scene {
   private vignetteRect!:  Phaser.GameObjects.Rectangle;
 
   private waveIndex       = 0;
-  private wasOnGround     = false;
-
-  private blinkTween:     Phaser.Tweens.Tween | null = null;
   private bgTile!:        Phaser.GameObjects.TileSprite;
 
   constructor() { super("GameScene"); }
@@ -74,8 +71,7 @@ export class GameScene extends Phaser.Scene {
     this.health               = 10;
     this.jumpsAvailable       = 1;
     this.waveIndex            = 0;
-    this.wasOnGround          = false;
-    this.blinkTween           = null;
+
     this.difficultyMultiplier = this.registry.get("difficulty") === "hard" ? 2 : 1;
 
     this.physics.world.setBounds(0, -800, LEVEL_WIDTH, 1520);
@@ -174,7 +170,6 @@ export class GameScene extends Phaser.Scene {
     if (onGround) {
       this.jumpsAvailable = 1;
     }
-    this.wasOnGround = onGround;
 
     const leftStickX = this.pad?.leftStick.x ?? 0;
     const buttonA    = this.pad?.isButtonDown(0) ?? false;

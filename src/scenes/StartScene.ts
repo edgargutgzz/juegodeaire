@@ -42,7 +42,7 @@ export class StartScene extends Phaser.Scene {
       color: "#ffffff", stroke: "#003388", strokeThickness: 4,
     }).setOrigin(0.5);
 
-    const container = this.add.container(0, 0, [bannerG, title, prompt]);
+    this.add.container(0, 0, [bannerG, title, prompt]);
 
     this.tweens.add({
       targets: prompt, alpha: 0.15,
