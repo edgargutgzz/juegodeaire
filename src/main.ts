@@ -14,7 +14,7 @@ const startGame = () => new Phaser.Game({
     antialiasGL: true,
     pixelArt: false,
   },
-  backgroundColor: "#64b4e6",
+  backgroundColor: "#d4eaf7",
   input: {
     gamepad: true,
   },

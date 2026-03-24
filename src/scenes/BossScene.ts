@@ -18,9 +18,6 @@ const STACKS = [
 ];
 
 const BOSS_DURATION   = 60000;
-const DASH_COOLDOWN   = 1400;
-const DASH_DURATION   = 180;
-const DASH_SPEED      = 620;
 
 type SmokeParticle = {
   img: Phaser.GameObjects.Ellipse;
@@ -33,19 +30,13 @@ export class BossScene extends Phaser.Scene {
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private projectiles!: Phaser.Physics.Arcade.Group;
   private cursors!:   Phaser.Types.Input.Keyboard.CursorKeys;
-  private shiftKey!:  Phaser.Input.Keyboard.Key;
   private pad:        Phaser.Input.Gamepad.Gamepad | null = null;
 
   private health        = 10;
   private invincible    = false;
-  private dashInvincible = false;
-  private isDashing     = false;
   private isCrouching   = false;
-  private jumpsAvailable = 2;
-  private jumpCount     = 0;
+  private jumpsAvailable = 1;
   private wasOnGround   = false;
-  private lastDashTime  = -9999;
-  private padWasB       = false;
   private levelComplete = false;
 
   private bossBarGfx!:  Phaser.GameObjects.Graphics;
@@ -66,23 +57,27 @@ export class BossScene extends Phaser.Scene {
   constructor() { super("BossScene"); }
 
   preload() {
-    if (!this.cache.audio.exists("bossbattle"))
-      this.load.audio("bossbattle", "/assets/music/bossbattle.mp3");
-
     const sfxMap: [string, string][] = [
       ["sfx_powerup",    "/assets/sfx/SoundBonus.wav"],
       ["sfx_jump",       "/assets/sfx/SoundJump1.wav"],
-      ["sfx_doublejump", "/assets/sfx/SoundJump2.wav"],
       ["sfx_land",       "/assets/sfx/SoundLand1.wav"],
       ["sfx_hit",        "/assets/sfx/SoundPlayerHit.wav"],
       ["sfx_explode",    "/assets/sfx/SoundExplosionSmall.wav"],
       ["sfx_goal",       "/assets/sfx/SoundReachGoal.wav"],
       ["sfx_gameover",   "/assets/sfx/SoundGameOver.wav"],
-      ["sfx_dash",       "/assets/sfx/SoundSpecialSkill.wav"],
       ["sfx_death",      "/assets/sfx/SoundDeath.wav"],
     ];
     for (const [key, path] of sfxMap) {
       if (!this.cache.audio.exists(key)) this.load.audio(key, path);
+    }
+    if (!this.textures.exists("ptcl_spark1")) {
+      this.load.image("ptcl_spark1", "/assets/particles/spark_01.png");
+      this.load.image("ptcl_spark2", "/assets/particles/spark_02.png");
+      this.load.image("ptcl_spark3", "/assets/particles/spark_03.png");
+    }
+    if (!this.textures.exists("expl_0")) {
+      for (let i = 0; i <= 8; i++)
+        this.load.image(`expl_${i}`, `/assets/particles/explosion/explosion0${i}.png`);
     }
     const character = this.registry.get("character") || "maleAdventurer";
     if (!this.textures.exists("char_idle")) {
@@ -99,13 +94,9 @@ export class BossScene extends Phaser.Scene {
     this.levelComplete   = false;
     this.health          = 10;
     this.invincible      = false;
-    this.dashInvincible  = false;
-    this.isDashing       = false;
     this.isCrouching     = false;
-    this.jumpsAvailable  = 2;
-    this.jumpCount       = 0;
+    this.jumpsAvailable  = 1;
     this.wasOnGround     = false;
-    this.lastDashTime    = -9999;
     this.startTime       = -1; // set on first update tick
     this.smokeParticles  = [];
     this.warningLights   = [];
@@ -147,7 +138,6 @@ export class BossScene extends Phaser.Scene {
 
     // ── Input ─────────────────────────────────────────────────────
     this.cursors  = this.input.keyboard!.createCursorKeys();
-    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.input.gamepad!.once("connected", (pad: Phaser.Input.Gamepad.Gamepad) => { this.pad = pad; });
     if (this.input.gamepad!.total > 0) this.pad = this.input.gamepad!.getPad(0);
 
@@ -288,7 +278,7 @@ export class BossScene extends Phaser.Scene {
 
     // Music kicks in on landing
     this.time.delayedCall(200, () => {
-      this.sound.play("bossbattle", { loop: true, volume: 0.7 });
+      // this.sound.play("bossbattle", { loop: true, volume: 0.7 });
     });
 
     // Release player control and start waves after 1.2s
@@ -306,8 +296,7 @@ export class BossScene extends Phaser.Scene {
     const onGround = this.player.body!.blocked.down;
     if (onGround) {
       if (!this.wasOnGround) this.sfx("sfx_land", 0.4);
-      this.jumpsAvailable = 2;
-      this.jumpCount      = 0;
+      this.jumpsAvailable = 1;
     }
     this.wasOnGround = onGround;
 
@@ -327,16 +316,12 @@ export class BossScene extends Phaser.Scene {
     // ── Input ─────────────────────────────────────────────────────
     const lx      = this.pad?.leftStick.x ?? 0;
     const buttonA = this.pad?.isButtonDown(0) ?? false;
-    const buttonB = this.pad?.isButtonDown(1) ?? false;
 
     const goLeft  = this.cursors.left.isDown  || lx < -0.3 || (this.pad?.left  ?? false);
     const goRight = this.cursors.right.isDown || lx >  0.3 || (this.pad?.right ?? false);
     const crouch  = this.cursors.down.isDown  || (this.pad?.down ?? false);
     const jump    = Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
                     Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonA;
-    const doDash  = (Phaser.Input.Keyboard.JustDown(this.shiftKey) || (buttonB && !this.padWasB)) &&
-                    !this.isDashing && (this.time.now - this.lastDashTime) > DASH_COOLDOWN;
-    this.padWasB  = buttonB;
 
     // ── Crouch ────────────────────────────────────────────────────
     const body = this.player.body as Phaser.Physics.Arcade.Body;
@@ -350,20 +335,13 @@ export class BossScene extends Phaser.Scene {
       body.setSize(64, 88, false).setOffset(16, 20);
     }
 
-    if (doDash && !this.isCrouching) {
-      this.performDash(goLeft ? -1 : goRight ? 1 : (this.player.flipX ? -1 : 1));
-    }
-
-    if (!this.isDashing) {
-      if (goLeft)       { this.player.setVelocityX(-220); this.player.setFlipX(true);  }
-      else if (goRight) { this.player.setVelocityX( 220); this.player.setFlipX(false); }
-      else              { this.player.setVelocityX(0); }
-    }
+    if (goLeft)       { this.player.setVelocityX(-220); this.player.setFlipX(true);  }
+    else if (goRight) { this.player.setVelocityX( 220); this.player.setFlipX(false); }
+    else              { this.player.setVelocityX(0); }
 
     if (jump && this.jumpsAvailable > 0 && !this.isCrouching) {
       this.player.setVelocityY(-520);
-      this.sfx(this.jumpCount === 0 ? "sfx_jump" : "sfx_doublejump", 0.6);
-      this.jumpCount++;
+      this.sfx("sfx_jump", 0.6);
       this.jumpsAvailable--;
     }
 
@@ -816,49 +794,53 @@ export class BossScene extends Phaser.Scene {
   // ── Particles ─────────────────────────────────────────────────────
 
   private spawnParticles(x: number, y: number) {
-    const colors = [0xff4400, 0xff8800, 0xffcc00, 0xaadd00];
-    for (let i = 0; i < 8; i++) {
-      const angle = (i / 8) * Math.PI * 2;
-      const speed = Phaser.Math.Between(60, 130);
-      const key   = `bptcl_${Date.now()}_${i}`;
-      const gfx   = this.make.graphics({ x: 0, y: 0 } as any);
-      gfx.fillStyle(colors[i % colors.length], 1);
-      gfx.fillCircle(4, 4, 4);
-      gfx.generateTexture(key, 8, 8);
-      gfx.destroy();
-      const dot = this.add.image(x, y, key).setDepth(15);
+    // Explosion animation
+    const frames = 9;
+    const frameDuration = 55;
+    let frame = 0;
+    const img = this.add.image(x, y, "expl_0")
+      .setDepth(16).setScale(0.8).setAlpha(0.95);
+    const timer = this.time.addEvent({
+      delay: frameDuration,
+      repeat: frames - 1,
+      callback: () => {
+        frame++;
+        if (frame < frames) {
+          img.setTexture(`expl_${frame}`);
+        } else {
+          img.destroy();
+          timer.remove();
+        }
+      },
+    });
+
+    // Sparks
+    const sparkKeys = ["ptcl_spark1", "ptcl_spark2", "ptcl_spark3"];
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      const speed = Phaser.Math.Between(50, 120);
+      const spark = this.add.image(x, y, sparkKeys[i % sparkKeys.length])
+        .setDepth(15)
+        .setScale(Phaser.Math.FloatBetween(0.1, 0.25))
+        .setTint(0xff6600)
+        .setAngle(Phaser.Math.Between(0, 360));
       this.tweens.add({
-        targets: dot,
+        targets: spark,
         x: x + Math.cos(angle) * speed,
         y: y + Math.sin(angle) * speed,
-        alpha: 0, scaleX: 0.1, scaleY: 0.1,
-        duration: 360, ease: "Quad.Out",
-        onComplete: () => { dot.destroy(); if (this.textures.exists(key)) this.textures.remove(key); },
+        alpha: 0, scale: 0,
+        duration: Phaser.Math.Between(300, 500),
+        ease: "Quad.Out",
+        onComplete: () => spark.destroy(),
       });
     }
   }
 
-  // ── Dash ──────────────────────────────────────────────────────────
-
-  private performDash(dir: number) {
-    this.isDashing      = true;
-    this.dashInvincible = true;
-    this.lastDashTime   = this.time.now;
-    this.sfx("sfx_dash", 0.5);
-    this.player.setVelocityX(dir * DASH_SPEED);
-    this.player.setFlipX(dir < 0);
-    this.player.setTint(0x88ccff);
-    this.time.delayedCall(DASH_DURATION, () => {
-      this.isDashing      = false;
-      this.dashInvincible = false;
-      this.player.clearTint();
-    });
-  }
 
   // ── Hit & death ───────────────────────────────────────────────────
 
   private onHit() {
-    if (this.invincible || this.dashInvincible || this.maskInvincible || this.levelComplete) return;
+    if (this.invincible || this.maskInvincible || this.levelComplete) return;
     this.invincible = true;
     this.health     = Math.max(0, this.health - 1);
     this.drawHealthBar();
@@ -1013,7 +995,7 @@ export class BossScene extends Phaser.Scene {
 
   // ── Util ──────────────────────────────────────────────────────────
 
-  private sfx(key: string, volume = 1) {
-    if (this.cache.audio.exists(key)) this.sound.play(key, { volume });
+  private sfx(_key: string, _volume = 1) {
+    // if (this.cache.audio.exists(_key)) this.sound.play(_key, { volume: _volume });
   }
 }

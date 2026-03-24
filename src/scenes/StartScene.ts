@@ -18,7 +18,7 @@ export class StartScene extends Phaser.Scene {
     const bannerH = H * 0.38;
     const bannerX = W / 2 - bannerW / 2;
     const bannerY = H * 0.06;
-    const bannerG = this.add.graphics().setDepth(10);
+    const bannerG = this.add.graphics();
     bannerG.fillStyle(0x000000, 0.35);
     bannerG.fillRect(bannerX + 6, bannerY + 6, bannerW, bannerH);
     bannerG.fillGradientStyle(0x001833, 0x001833, 0x002f66, 0x002f66, 0.94);
@@ -29,18 +29,20 @@ export class StartScene extends Phaser.Scene {
     bannerG.strokeRect(bannerX + 6, bannerY + 6, bannerW - 12, bannerH - 12);
 
     // ── Título ────────────────────────────────────────────────────
-    this.add.text(W / 2, H * 0.25, "NO SE VEN\nLAS MONTAÑAS", {
+    const title = this.add.text(W / 2, H * 0.25, "NO SE VEN\nLAS MONTAÑAS", {
       fontSize: "52px", fontFamily: "'Press Start 2P'",
       color: "#ffffff", stroke: "#003388", strokeThickness: 10,
       align: "center", lineSpacing: 18,
       shadow: { offsetX: 5, offsetY: 5, color: "#001155", blur: 0, fill: true },
-    }).setOrigin(0.5).setDepth(15);
+    }).setOrigin(0.5);
 
     // ── Prompt parpadeante ────────────────────────────────────────
     const prompt = this.add.text(W / 2, H * 0.76, "PRESIONA PARA INICIAR", {
       fontSize: "16px", fontFamily: "'Press Start 2P'",
       color: "#ffffff", stroke: "#003388", strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(15);
+    }).setOrigin(0.5);
+
+    const container = this.add.container(0, 0, [bannerG, title, prompt]);
 
     this.tweens.add({
       targets: prompt, alpha: 0.15,
@@ -59,9 +61,16 @@ export class StartScene extends Phaser.Scene {
   }
 
   protected startGame() {
-    this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => {
-      this.scene.start("GameScene");
+    const container = this.children.list.find(
+      (c) => c instanceof Phaser.GameObjects.Container
+    ) as Phaser.GameObjects.Container;
+
+    this.tweens.add({
+      targets: container,
+      y: -this.scale.height,
+      duration: 600,
+      ease: "Quad.In",
+      onComplete: () => this.scene.start("GameScene"),
     });
   }
 }
