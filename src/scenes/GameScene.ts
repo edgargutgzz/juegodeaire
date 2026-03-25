@@ -4,6 +4,8 @@ const SIDEWALK_Y  = 660;
 const GROUND_Y    = SIDEWALK_Y - 70; // visual top of grass tile = 610
 const LEVEL_WIDTH = 6400;
 
+const TRANSITION_X = 3200;
+
 const PROJ_LOW  = GROUND_Y - 28;
 const PROJ_MID  = GROUND_Y - 90;
 const PROJ_HIGH = GROUND_Y - 155;
@@ -28,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   private difficultyMultiplier = 1;
 
   private healthBar!:     Phaser.GameObjects.Graphics;
+  private criticalTween:  Phaser.Tweens.Tween | null = null;
   private smogOverlay!:   Phaser.GameObjects.Rectangle;
   private vignetteRect!:  Phaser.GameObjects.Rectangle;
 
@@ -47,6 +50,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.load.image("bg_talltrees",   "/assets/bg/bg_talltrees.png");
+    this.load.image("bld_beige_front", "/assets/buildings/house_beige_front.png");
+    this.load.image("bld_beige_side",  "/assets/buildings/house_beige_side.png");
+    this.load.image("bld_grey_front",  "/assets/buildings/house_grey_front.png");
+    this.load.image("bld_grey_side",   "/assets/buildings/house_grey_side.png");
     this.load.image("ground_top",     "/assets/ground/ground_top.png");
     this.load.image("ground_fill",    "/assets/ground/ground_fill.png");
     this.load.image("asphalt_top",    "/assets/ground/asphalt_top.png");
@@ -56,12 +63,12 @@ export class GameScene extends Phaser.Scene {
     this.load.image("ptcl_spark3", "/assets/particles/spark_03.png");
     for (let i = 0; i <= 8; i++)
       this.load.image(`expl_${i}`, `/assets/particles/explosion/explosion0${i}.png`);
-    this.load.audio("sfx_jump",       "/assets/sfx/SoundJump1.wav");
-    this.load.audio("sfx_hit",        "/assets/sfx/SoundPlayerHit.wav");
-    this.load.audio("sfx_explode",    "/assets/sfx/SoundExplosionSmall.wav");
-    this.load.audio("sfx_goal",       "/assets/sfx/SoundReachGoal.wav");
-    this.load.audio("sfx_gameover",   "/assets/sfx/SoundGameOver.wav");
-    this.load.audio("sfx_death",      "/assets/sfx/SoundDeath.wav");
+    // this.load.audio("sfx_jump",       "/assets/sfx/SoundJump1.wav");
+    // this.load.audio("sfx_hit",        "/assets/sfx/SoundPlayerHit.wav");
+    // this.load.audio("sfx_explode",    "/assets/sfx/SoundExplosionSmall.wav");
+    // this.load.audio("sfx_goal",       "/assets/sfx/SoundReachGoal.wav");
+    // this.load.audio("sfx_gameover",   "/assets/sfx/SoundGameOver.wav");
+    // this.load.audio("sfx_death",      "/assets/sfx/SoundDeath.wav");
   }
 
   create() {
@@ -132,12 +139,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     // ── HUD ───────────────────────────────────────────────────────
-    this.add.text(20, 20, "AIRE", {
-      fontSize: "10px", fontFamily: "'Press Start 2P'", color: "#ffffff",
-    }).setScrollFactor(0).setDepth(10);
-
     this.healthBar = this.add.graphics().setScrollFactor(0).setDepth(10);
     this.drawHealthBar();
+
 
 
     // ── Smog overlay (thickens as health drops) ───────────────────
@@ -165,6 +169,12 @@ export class GameScene extends Phaser.Scene {
   update() {
     if (this.levelComplete) return;
     this.bgTile.tilePositionX = this.cameras.main.scrollX * 0.2;
+
+    // Fade out trees as player enters city zone
+    const fadeStart = TRANSITION_X + 100;
+    const fadeEnd   = TRANSITION_X + 700;
+    const treeAlpha = 1 - Phaser.Math.Clamp((this.player.x - fadeStart) / (fadeEnd - fadeStart), 0, 1);
+    this.bgTile.setAlpha(treeAlpha);
 
     const onGround   = this.player.body!.blocked.down;
     if (onGround) {
@@ -300,7 +310,6 @@ export class GameScene extends Phaser.Scene {
     this.drawCityBackground();
 
     // ── Ground visuals ────────────────────────────────────────────
-    const TRANSITION_X = 3200; // grass → asphalt
     const grassW   = TRANSITION_X;
     const asphaltW = LEVEL_WIDTH - TRANSITION_X;
 
@@ -322,6 +331,8 @@ export class GameScene extends Phaser.Scene {
     this.add.tileSprite(TRANSITION_X, SIDEWALK_Y, asphaltW, 70, "asphalt_top")
       .setOrigin(0, 1).setDepth(2);
 
+    // ── City buildings (background decoration after TRANSITION_X) ──
+    this.buildCityscape(TRANSITION_X, GROUND_Y);
 
     const canvas = document.createElement("canvas");
     canvas.width = 64; canvas.height = 16;
@@ -333,6 +344,30 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+
+  private buildCityscape(startX: number, groundY: number) {
+    const layout: [string, number, number][] = [
+      ["bld_grey_side",   startX + 80,   1.6],
+      ["bld_beige_front", startX + 340,  1.5],
+      ["bld_grey_front",  startX + 560,  1.6],
+      ["bld_beige_side",  startX + 800,  1.5],
+      ["bld_grey_side",   startX + 1060, 1.6],
+      ["bld_beige_front", startX + 1320, 1.5],
+      ["bld_grey_front",  startX + 1540, 1.7],
+      ["bld_beige_side",  startX + 1800, 1.5],
+      ["bld_grey_side",   startX + 2060, 1.6],
+      ["bld_beige_front", startX + 2320, 1.5],
+      ["bld_grey_front",  startX + 2540, 1.6],
+      ["bld_beige_side",  startX + 2780, 1.5],
+    ];
+
+    for (const [key, x, scale] of layout) {
+      this.add.image(x, groundY, key)
+        .setOrigin(0.5, 1)
+        .setScale(scale)
+        .setDepth(1);
+    }
+  }
 
   private drawCityBackground() {
     const W = this.scale.width;
@@ -438,7 +473,7 @@ export class GameScene extends Phaser.Scene {
   private fireDiagonal(spawnX: number, spawnY: number) {
     const isPM25  = Math.random() < 0.6;
     const radius  = isPM25 ? 6 : 14;
-    const color   = isPM25 ? 0x9933cc : 0xcc3300;
+    const color   = isPM25 ? 0x999999 : 0xbbbbbb;
     const damage  = isPM25 ? 3 : 1;
     const vx      = -(80 + Math.random() * 60) * this.projSpeedMult;
     const vy      = 60 + Math.random() * 50;
@@ -474,7 +509,7 @@ export class GameScene extends Phaser.Scene {
   private fireProjectile(targetY: number, isPM25 = false, extraOffsetX = 0) {
     const spawnX  = this.cameras.main.scrollX + 1380 + extraOffsetX;
     const radius  = isPM25 ? 7 : 18;
-    const color   = isPM25 ? 0x9933cc : 0xcc3300;
+    const color   = isPM25 ? 0x999999 : 0xbbbbbb;
     const damage  = isPM25 ? 3 : 1;
     const speedVariation = 0.8 + Math.random() * 0.4; // ±20%
     const baseSpd = isPM25 ? -180 : -150;
@@ -576,79 +611,115 @@ export class GameScene extends Phaser.Scene {
 
 
 
-  private sfx(key: string, volume = 1) {
-    if (this.cache.audio.exists(key)) this.sound.play(key, { volume });
+  private sfx(_key: string, _volume = 1) {
+    // if (this.cache.audio.exists(_key)) this.sound.play(_key, { volume: _volume });
   }
 
   private drawHealthBar() {
-    const segments = 10;
-    const segH     = 16;
-    const segGap   = 1;
-    const innerW   = 22;
-    const railW    = 7;
-    const totalW   = innerW + railW * 2;
-    const totalH   = segments * segH + (segments - 1) * segGap;
-    const barX     = 20;
-    const barTop   = 38;
-
     this.healthBar.clear();
 
-    this.healthBar.fillStyle(0x222222, 1);
-    this.healthBar.fillRect(barX, barTop - 10, totalW, 10);
-    this.healthBar.fillStyle(0x666666, 1);
-    this.healthBar.fillRect(barX + 2, barTop - 10, totalW - 4, 3);
+    // ── Pixel heart ───────────────────────────────────────────────
+    const px = 5; // pixel size
+    const hx = 16;
+    const hy = 28;
+    const heart = [
+      [0,1,1,0,1,1,0],
+      [1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,0],
+      [0,0,1,1,1,0,0],
+      [0,0,0,1,0,0,0],
+    ];
 
-    this.healthBar.fillStyle(0x110000, 1);
-    this.healthBar.fillRect(barX + railW, barTop, innerW, totalH);
+    // Drop shadow
+    this.healthBar.fillStyle(0x550000, 1);
+    for (let r = 0; r < heart.length; r++)
+      for (let c = 0; c < heart[r].length; c++)
+        if (heart[r][c])
+          this.healthBar.fillRect(hx + c * px + 2, hy + r * px + 2, px, px);
 
-    for (let i = 0; i < segments; i++) {
-      const segY   = barTop + totalH - (i + 1) * segH - i * segGap;
-      const filled = i < this.health;
-      if (filled) {
-        this.healthBar.fillStyle(0xcc2200, 1);
-        this.healthBar.fillRect(barX + railW, segY + segH / 2, innerW, segH / 2);
-        this.healthBar.fillStyle(0xff7722, 1);
-        this.healthBar.fillRect(barX + railW, segY, innerW, segH / 2);
-        this.healthBar.fillStyle(0xffcc66, 0.35);
-        this.healthBar.fillRect(barX + railW, segY, innerW, 2);
-      } else {
-        this.healthBar.fillStyle(0x1e0000, 1);
-        this.healthBar.fillRect(barX + railW, segY, innerW, segH);
-      }
-      this.healthBar.fillStyle(0x000000, 1);
-      this.healthBar.fillRect(barX + railW, segY + segH - 1, innerW, 1);
+    // Main red
+    this.healthBar.fillStyle(0xcc1111, 1);
+    for (let r = 0; r < heart.length; r++)
+      for (let c = 0; c < heart[r].length; c++)
+        if (heart[r][c])
+          this.healthBar.fillRect(hx + c * px, hy + r * px, px, px);
+
+    // Highlight pixels (top-left of each lobe)
+    this.healthBar.fillStyle(0xff6666, 1);
+    this.healthBar.fillRect(hx + 1 * px, hy + 0 * px, px, px);
+    this.healthBar.fillRect(hx + 4 * px, hy + 0 * px, px, px);
+    this.healthBar.fillStyle(0xffffff, 0.7);
+    this.healthBar.fillRect(hx + 1 * px, hy + 0 * px, 3, 3);
+    this.healthBar.fillRect(hx + 4 * px, hy + 0 * px, 3, 3);
+
+    // ── Segmented bar ─────────────────────────────────────────────
+    const segments  = 10;
+    const heartW    = 7 * px;
+    const barX      = hx + heartW + 18;
+    const barH      = 22;
+    const barW      = 230;
+    const barY      = hy + (heart.length * px - barH) / 2;
+    const border    = 3;
+    const corner    = 5;          // outer corner cut (pixelated rounding)
+    const ic        = corner - border; // inner corner cut = 2
+    const segW      = barW / segments;
+
+    // Segment colors based on health
+    let hi: number, lo: number;
+    if (this.health >= 7)      { hi = 0x44cc55; lo = 0x228833; }
+    else if (this.health >= 4) { hi = 0xffbb00; lo = 0xcc7700; }
+    else                       { hi = 0xee3311; lo = 0xaa1100; }
+
+    // Outer border — pixelated rounded hollow outline
+    const bx   = barX - border, by = barY - border, bw = barW + border * 2, bh = barH + border * 2;
+    const step = corner - border; // = 2 (diagonal corner step)
+
+    this.healthBar.fillStyle(0x000000, 1);
+    this.healthBar.fillRect(bx + corner,          by,                    bw - corner * 2, border); // top
+    this.healthBar.fillRect(bx + corner,          by + bh - border,      bw - corner * 2, border); // bottom
+    this.healthBar.fillRect(bx,                   by + corner,           border, bh - corner * 2); // left
+    this.healthBar.fillRect(bx + bw - border,     by + corner,           border, bh - corner * 2); // right
+    // Corner step pieces
+    this.healthBar.fillRect(bx + border,               by + border,               step, step); // top-left
+    this.healthBar.fillRect(bx + bw - border - step,   by + border,               step, step); // top-right
+    this.healthBar.fillRect(bx + border,               by + bh - border - step,   step, step); // bottom-left
+    this.healthBar.fillRect(bx + bw - border - step,   by + bh - border - step,   step, step); // bottom-right
+
+    // Filled segments — clip corners on first and last segment
+    for (let i = 0; i < this.health; i++) {
+      const sx    = barX + i * segW;
+      const clipL = i === 0            ? ic : 0;
+      const clipR = i === segments - 1 ? ic : 0;
+      const adjW  = segW - clipL - clipR;
+
+      // Top half (lighter) — corner strip + middle
+      this.healthBar.fillStyle(hi, 1);
+      this.healthBar.fillRect(sx + clipL, barY,        adjW, ic);            // corner strip
+      this.healthBar.fillRect(sx,         barY + ic,   segW, barH / 2 - ic); // middle
+
+      // Bottom half (darker) — middle + corner strip
+      this.healthBar.fillStyle(lo, 1);
+      this.healthBar.fillRect(sx,         barY + barH / 2,        segW, barH / 2 - ic); // middle
+      this.healthBar.fillRect(sx + clipL, barY + barH - ic,       adjW, ic);            // corner strip
     }
 
-    // Rails
-    for (const rx of [barX, barX + railW + innerW]) {
-      this.healthBar.fillStyle(0x888888, 1);
-      this.healthBar.fillRect(rx, barTop, railW, totalH);
-      this.healthBar.fillStyle(0xdddddd, 1);
-      this.healthBar.fillRect(rx, barTop, 2, totalH);
-      this.healthBar.fillStyle(0x444444, 1);
-      this.healthBar.fillRect(rx + railW - 2, barTop, 2, totalH);
-      for (let y = barTop + 6; y < barTop + totalH - 4; y += 24) {
-        this.healthBar.fillRect(rx + 1, y, railW - 2, 4);
-      }
+    // Segment dividers
+    this.healthBar.fillStyle(0x000000, 1);
+    for (let i = 1; i < segments; i++) {
+      this.healthBar.fillRect(barX + i * segW - 1, barY, 2, barH);
     }
 
-    this.healthBar.fillStyle(0x222222, 1);
-    this.healthBar.fillRect(barX, barTop + totalH, totalW, 8);
-    this.healthBar.fillStyle(0x555555, 1);
-    this.healthBar.fillRect(barX + 2, barTop + totalH, totalW - 4, 3);
-
-    const gemX = barX + totalW / 2;
-    const gemY = barTop + totalH + 18;
-    this.healthBar.fillStyle(0x111133, 1);
-    this.healthBar.fillCircle(gemX, gemY, 11);
-    this.healthBar.fillStyle(0x2255cc, 1);
-    this.healthBar.fillCircle(gemX, gemY, 9);
-    this.healthBar.fillStyle(0x88aaff, 0.7);
-    this.healthBar.fillCircle(gemX - 3, gemY - 3, 4);
-    this.healthBar.fillStyle(0xffffff, 0.5);
-    this.healthBar.fillCircle(gemX - 3, gemY - 4, 2);
-
-    // Label below gem
-    // (static text added in create, bar handles graphics only)
+    // ── Blink on critical ─────────────────────────────────────────
+    if (this.health <= 2 && !this.criticalTween) {
+      this.criticalTween = this.tweens.add({
+        targets: this.healthBar, alpha: 0.25,
+        duration: 300, ease: "Sine.easeInOut", yoyo: true, repeat: -1,
+      });
+    } else if (this.health > 2 && this.criticalTween) {
+      this.criticalTween.stop();
+      this.criticalTween = null;
+      this.healthBar.setAlpha(1);
+    }
   }
 }

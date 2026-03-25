@@ -163,7 +163,7 @@ export class BossScene extends Phaser.Scene {
     });
 
     // ── Dramatic intro sequence ───────────────────────────────────
-    this.sound.stopAll();
+    // this.sound.stopAll();
     this.runBossIntro();
   }
 
@@ -857,7 +857,7 @@ export class BossScene extends Phaser.Scene {
     if (this.health <= 0) {
       this.levelComplete = true;
       this.sfx("sfx_death", 0.8);
-      this.sound.stopByKey("bossbattle");
+      // this.sound.stopByKey("bossbattle");
       this.time.delayedCall(600, () => this.sfx("sfx_gameover", 0.8));
       this.cameras.main.fadeOut(900, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("GameOverScene"));
@@ -901,7 +901,7 @@ export class BossScene extends Phaser.Scene {
     this.tweens.add({ targets: win, alpha: 1, duration: 300, delay: 600 });
 
     this.time.delayedCall(3000, () => {
-      this.sound.stopAll();
+      // this.sound.stopAll();
       this.cameras.main.fadeOut(800, 255, 255, 255);
       this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("LevelCompleteScene"));
     });

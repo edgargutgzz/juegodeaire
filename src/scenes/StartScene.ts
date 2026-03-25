@@ -6,7 +6,7 @@ export class StartScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.audio("bgmusic", "/assets/music/bgmusic.wav");
+    // this.load.audio("bgmusic", "/assets/music/bgmusic.wav");
   }
 
   create() {
@@ -50,14 +50,14 @@ export class StartScene extends Phaser.Scene {
     });
 
     // Start music on first input (browser autoplay policy requires user gesture)
-    const startMusic = () => {
-      if (!this.sound.get("bgmusic")) {
-        this.sound.play("bgmusic", { loop: true, volume: 0.6 });
-      }
-    };
+    // const startMusic = () => {
+    //   if (!this.sound.get("bgmusic")) {
+    //     this.sound.play("bgmusic", { loop: true, volume: 0.6 });
+    //   }
+    // };
 
-    this.input.keyboard!.once("keydown", () => { startMusic(); this.startGame(); });
-    this.input.gamepad!.once("down", () => { startMusic(); this.startGame(); });
+    this.input.keyboard!.once("keydown", () => { /* startMusic(); */ this.startGame(); });
+    this.input.gamepad!.once("down", () => { /* startMusic(); */ this.startGame(); });
   }
 
   protected startGame() {
