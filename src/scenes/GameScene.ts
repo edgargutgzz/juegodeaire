@@ -195,8 +195,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     const leftStickX = this.pad?.leftStick.x ?? 0;
+    const leftStickY = this.pad?.leftStick.y ?? 0;
     const buttonA    = this.pad?.isButtonDown(0) ?? false;
-    const dpadUp     = this.pad?.up ?? false;
+    const dpadUp     = (this.pad?.up ?? false) || leftStickY < -0.3;
     const buttonAJust = buttonA && !this.wasButtonDown;
     const dpadUpJust  = dpadUp && !this.wasDpadUp;
     this.wasButtonDown = buttonA;
@@ -206,7 +207,7 @@ export class GameScene extends Phaser.Scene {
 
     const goLeft  = this.cursors.left.isDown  || leftStickX < -0.3 || dpadLeft;
     const goRight = this.cursors.right.isDown || leftStickX >  0.3 || dpadRight;
-    const crouch  = this.cursors.down.isDown  || (this.pad?.down ?? false);
+    const crouch  = this.cursors.down.isDown  || (this.pad?.down ?? false) || leftStickY > 0.3;
     const jump    = Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
                     Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonAJust || dpadUpJust;
 
