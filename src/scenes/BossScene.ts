@@ -31,6 +31,7 @@ export class BossScene extends Phaser.Scene {
   private projectiles!: Phaser.Physics.Arcade.Group;
   private cursors!:   Phaser.Types.Input.Keyboard.CursorKeys;
   private pad:        Phaser.Input.Gamepad.Gamepad | null = null;
+  private wasButtonDown = false;
 
   private health        = 10;
   private invincible    = false;
@@ -316,12 +317,14 @@ export class BossScene extends Phaser.Scene {
     // ── Input ─────────────────────────────────────────────────────
     const lx      = this.pad?.leftStick.x ?? 0;
     const buttonA = this.pad?.isButtonDown(0) ?? false;
+    const buttonAJust = buttonA && !this.wasButtonDown;
+    this.wasButtonDown = buttonA;
 
     const goLeft  = this.cursors.left.isDown  || lx < -0.3 || (this.pad?.left  ?? false);
     const goRight = this.cursors.right.isDown || lx >  0.3 || (this.pad?.right ?? false);
     const crouch  = this.cursors.down.isDown  || (this.pad?.down ?? false);
     const jump    = Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
-                    Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonA;
+                    Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonAJust;
 
     // ── Crouch ────────────────────────────────────────────────────
     const body = this.player.body as Phaser.Physics.Arcade.Body;
