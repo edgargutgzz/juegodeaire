@@ -206,7 +206,15 @@ export class CharacterScene extends Phaser.Scene {
     if (this.animTimer) { this.animTimer.remove(); this.animTimer = null; }
     this.sound.play("sfx_select", { volume: 1.0 });
     this.registry.set("character", this.options[this.selected].key);
-    this.cameras.main.fadeOut(400, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("GameScene"));
+
+    const music = this.sound.get("venus");
+    if (music) {
+      this.tweens.add({ targets: music, volume: 0, duration: 1200, onComplete: () => {
+        this.sound.stopAll();
+        this.scene.start("GameScene");
+      }});
+    } else {
+      this.scene.start("GameScene");
+    }
   }
 }

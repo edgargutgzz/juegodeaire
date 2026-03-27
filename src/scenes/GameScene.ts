@@ -21,6 +21,7 @@ export class GameScene extends Phaser.Scene {
   private pad: Phaser.Input.Gamepad.Gamepad | null = null;
   private wasButtonDown   = false;
   private wasDpadUp       = false;
+  private briefingActive  = false;
 
   private invincible      = false;
   private isCrouching     = false;
@@ -39,8 +40,6 @@ export class GameScene extends Phaser.Scene {
 
   private waveIndex         = 0;
   private carSpawnerStarted = false;
-  private bgTile!:          Phaser.GameObjects.TileSprite;
-  private industrySky!:     Phaser.GameObjects.Rectangle;
   private staticCarData:    { img: Phaser.GameObjects.Image; nextFire: number; heights: number[] }[] = [];
 
   constructor() { super("GameScene"); }
@@ -89,7 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.waveIndex            = 0;
 
     this.sound.stopAll();
-    this.sound.play("mercury", { loop: true, volume: 0.6 });
+    this.sound.play("arcade_puzzler", { loop: true, volume: 0.6 });
 
     this.difficultyMultiplier = this.registry.get("difficultyMultiplier") ?? 1;
     this.carSpawnerStarted    = false;
@@ -143,7 +142,7 @@ export class GameScene extends Phaser.Scene {
         if (this.player.body!.blocked.down) {
           checkLanding.remove();
           this.player.setVisible(true);
-          this.time.delayedCall(200, () => { this.levelComplete = false; });
+          this.time.delayedCall(200, () => { this.showBriefing(); });
         }
       },
     });
@@ -177,14 +176,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   update() {
-    if (this.levelComplete) return;
-    this.bgTile.tilePositionX = this.cameras.main.scrollX * 0.2;
-    const treeAlpha = 1 - Phaser.Math.Clamp((this.player.x - TRANSITION_X - 100) / 600, 0, 1);
-    this.bgTile.setAlpha(treeAlpha);
+    // Briefing dismiss via gamepad
+    if (this.briefingActive && this._briefingDismiss && this._briefingInputEnabled?.()) {
+      const btn = this.pad?.buttons[0]?.pressed || this.pad?.buttons[1]?.pressed;
+      if (btn) { this._briefingDismiss(); return; }
+    }
 
-    // Sky se oscurece/anaranja al entrar a zona 3
-    const industryAlpha = Phaser.Math.Clamp((this.player.x - INDUSTRY_X) / 1200, 0, 0.55);
-    this.industrySky.setAlpha(industryAlpha);
+    if (this.levelComplete) return;
 
     // Trigger car spawner when entering industry zone
     if (!this.carSpawnerStarted && this.player.x >= INDUSTRY_X) {
@@ -315,21 +313,10 @@ export class GameScene extends Phaser.Scene {
   private buildWorld() {
     this.drawCityBackground();
 
-    // ── Ground visuals ────────────────────────────────────────────
-    const grassW   = TRANSITION_X;
-    const asphaltW = LEVEL_WIDTH - TRANSITION_X;
-
-    // Solid base fills
-    this.add.rectangle(TRANSITION_X / 2, SIDEWALK_Y + 100, grassW, 200, 0xc8904c).setDepth(0);
-    this.add.rectangle(TRANSITION_X + asphaltW / 2, SIDEWALK_Y + 100, asphaltW, 200, 0x8a9fa0).setDepth(0);
-
-    // Ground fills
-    this.add.tileSprite(0, SIDEWALK_Y - 2, grassW, 202, "ground_fill").setOrigin(0, 0).setDepth(1);
-    this.add.tileSprite(TRANSITION_X, SIDEWALK_Y - 2, asphaltW, 202, "asphalt_fill").setOrigin(0, 0).setDepth(1);
-
-    // Ground tops
-    this.add.tileSprite(0, SIDEWALK_Y, grassW, 70, "ground_top").setOrigin(0, 1).setDepth(2);
-    this.add.tileSprite(TRANSITION_X, SIDEWALK_Y, asphaltW, 70, "asphalt_top").setOrigin(0, 1).setDepth(2);
+    // ── Ground visuals (cemento a lo largo de todo el nivel) ──────
+    this.add.rectangle(LEVEL_WIDTH / 2, SIDEWALK_Y + 100, LEVEL_WIDTH, 200, 0x8a9fa0).setDepth(0);
+    this.add.tileSprite(0, SIDEWALK_Y - 2, LEVEL_WIDTH, 202, "asphalt_fill").setOrigin(0, 0).setDepth(1);
+    this.add.tileSprite(0, SIDEWALK_Y, LEVEL_WIDTH, 70, "asphalt_top").setOrigin(0, 1).setDepth(2);
 
     // Road markings in industry zone
     const dashG = this.add.graphics().setDepth(2);
@@ -385,23 +372,9 @@ export class GameScene extends Phaser.Scene {
   private drawCityBackground() {
     const W = this.scale.width;
     const H = this.scale.height;
-    // Below grass: top half green, bottom half brown
-    const belowH = H - GROUND_Y;
-    const greenH = belowH * 0.1;
-    const brownH = belowH * 0.9;
-    this.add.rectangle(W / 2, GROUND_Y + greenH / 2, W, greenH, 0x80be1f)
+    // Cielo azul plano
+    this.add.rectangle(W / 2, H / 2, W, H, 0x87ceeb)
       .setScrollFactor(0).setDepth(-3);
-    this.add.rectangle(W / 2, GROUND_Y + greenH + brownH / 2, W, brownH, 0xc8904c)
-      .setScrollFactor(0).setDepth(-3);
-    // Sky bg image
-    this.bgTile = this.add.tileSprite(0, -100, W, H, "bg_talltrees")
-      .setOrigin(0, 0)
-      .setScrollFactor(0)
-      .setDepth(-2);
-
-    // Industry sky overlay — naranja sucio, se funde al entrar a zona 3
-    this.industrySky = this.add.rectangle(W / 2, H / 2, W, H, 0xc47a2a)
-      .setScrollFactor(0).setDepth(-1).setAlpha(0);
   }
 
   // ── Pollution spawner (speed ramps with distance) ─────────────────
@@ -630,6 +603,136 @@ export class GameScene extends Phaser.Scene {
   private sfx(_key: string, _volume = 1) {
     // if (this.cache.audio.exists(_key)) this.sound.play(_key, { volume: _volume });
   }
+
+  private showBriefing() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    this.briefingActive = true;
+
+    const character = this.registry.get("character") || "maleAdventurer";
+    const difficulty = this.registry.get("difficulty") as "normal" | "dificil" ?? "normal";
+    const isHard = difficulty === "dificil";
+    const accentColor = isHard ? "#ff5533" : "#2ecc87";
+    const accentInt   = isHard ? 0xff5533   : 0x2ecc87;
+
+    // ── Overlay dimmer ────────────────────────────────────────────
+    const dimmer = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55)
+      .setScrollFactor(0).setDepth(20);
+
+    // ── Dialog box ────────────────────────────────────────────────
+    const boxH    = H * 0.36;
+    const boxY    = H - boxH * 0.5 - H * 0.04;
+    const boxX    = W * 0.04;
+    const boxW    = W * 0.92;
+
+    const boxBg = this.add.rectangle(boxX + boxW / 2, boxY, boxW, boxH, 0x0a0a0a, 0.95)
+      .setScrollFactor(0).setDepth(21);
+    const boxBorder = this.add.graphics().setScrollFactor(0).setDepth(22);
+    boxBorder.lineStyle(2, accentInt, 1);
+    boxBorder.strokeRect(boxX, boxY - boxH / 2, boxW, boxH);
+
+    // Accent top bar
+    const accentBar = this.add.rectangle(boxX + boxW / 2, boxY - boxH / 2, boxW, 3, accentInt, 1)
+      .setScrollFactor(0).setDepth(22);
+
+    // ── Character portrait ────────────────────────────────────────
+    const portraitSize = boxH * 0.78;
+    const portraitX    = boxX + portraitSize * 0.56;
+    const portraitY    = boxY;
+    const portrait = this.add.image(portraitX, portraitY, "char_idle")
+      .setScrollFactor(0).setDepth(23)
+      .setScale(portraitSize / 128);
+
+    // Portrait separator line
+    const sepX = portraitX + portraitSize * 0.56;
+    const lineGfx = this.add.graphics().setScrollFactor(0).setDepth(22);
+    lineGfx.lineStyle(1, accentInt, 0.4);
+    lineGfx.lineBetween(sepX, boxY - boxH / 2 + 10, sepX, boxY + boxH / 2 - 10);
+
+    // ── Name label ────────────────────────────────────────────────
+    const nameMap: Record<string, string> = {
+      malePerson:       "HABITANTE",
+      femalePerson:     "HABITANTE",
+      maleAdventurer:   "AVENTURERO",
+      femaleAdventurer: "AVENTURERA",
+    };
+    const nameLabel = this.add.text(portraitX, boxY + boxH / 2 - 18, nameMap[character] ?? "HABITANTE", {
+      fontSize: "9px", fontFamily: "'Press Start 2P'",
+      color: accentColor,
+    }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(23);
+
+    // ── Mission text ──────────────────────────────────────────────
+    const textX    = sepX + W * 0.03;
+    const textMaxW = boxX + boxW - textX - W * 0.03;
+    const textY    = boxY - boxH / 2 + 18;
+
+    const MISSION_LINES = [
+      "MISION:",
+      "",
+      "EL SMOG CUBRE LA CIUDAD.",
+      "CADA SEGUNDO QUE RESPIRAS",
+      "TE ACERCA AL FIN.",
+      "",
+      "ESCAPA ANTES DE QUE",
+      "SEA DEMASIADO TARDE.",
+    ];
+
+    const textObj = this.add.text(textX, textY, "", {
+      fontSize: "13px", fontFamily: "'Press Start 2P'",
+      color: "#cccccc",
+      wordWrap: { width: textMaxW },
+      lineSpacing: 6,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(23);
+
+    // Typewriter
+    const fullText = MISSION_LINES.join("\n");
+    let charIdx = 0;
+    const typeChar = () => {
+      if (charIdx >= fullText.length) {
+        showPrompt();
+        return;
+      }
+      charIdx++;
+      textObj.setText(fullText.slice(0, charIdx));
+      this.time.delayedCall(38, typeChar);
+    };
+    this.time.delayedCall(200, typeChar);
+
+    // ── Press to continue prompt ──────────────────────────────────
+    const promptText = this.add.text(boxX + boxW - 10, boxY + boxH / 2 - 12, "PRESIONA PARA CONTINUAR", {
+      fontSize: "9px", fontFamily: "'Press Start 2P'",
+      color: accentColor,
+    }).setOrigin(1, 1).setScrollFactor(0).setDepth(23).setAlpha(0);
+
+    const showPrompt = () => {
+      promptText.setAlpha(1);
+      this.tweens.add({ targets: promptText, alpha: 0.2, duration: 700, ease: "Sine.easeInOut", yoyo: true, repeat: -1 });
+      enableDismiss();
+    };
+
+    // ── Dismiss ───────────────────────────────────────────────────
+    const dismiss = () => {
+      if (!this.briefingActive) return;
+      this.briefingActive = false;
+      [dimmer, boxBg, boxBorder, accentBar, portrait, lineGfx, nameLabel, textObj, promptText].forEach(o => o.destroy());
+      this.levelComplete = false;
+    };
+
+    let inputEnabled = false;
+    const enableDismiss = () => {
+      inputEnabled = true;
+      this.input.keyboard!.once("keydown", () => { if (inputEnabled) dismiss(); });
+    };
+
+    // Gamepad dismiss handled in update via briefingActive flag
+    this._briefingDismiss = dismiss;
+    this._briefingInputEnabled = () => inputEnabled;
+
+  }
+
+  // Briefing dismiss hooks for update()
+  private _briefingDismiss: (() => void) | null = null;
+  private _briefingInputEnabled: (() => boolean) | null = null;
 
   private drawHealthBar() {
     this.healthBar.clear();
