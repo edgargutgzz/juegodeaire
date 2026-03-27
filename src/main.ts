@@ -1,6 +1,9 @@
 import Phaser from "phaser";
+import { BootScene } from "./scenes/BootScene";
+import { DataScene } from "./scenes/DataScene";
 import { StartScene } from "./scenes/StartScene";
 import { DifficultyScene } from "./scenes/DifficultyScene";
+import { CharacterScene } from "./scenes/CharacterScene";
 import { GameScene } from "./scenes/GameScene";
 import { BossScene } from "./scenes/BossScene";
 import { LevelCompleteScene } from "./scenes/LevelCompleteScene";
@@ -15,7 +18,7 @@ const startGame = () => new Phaser.Game({
     antialiasGL: true,
     pixelArt: false,
   },
-  backgroundColor: "#d4eaf7",
+  backgroundColor: "#000000",
   input: {
     gamepad: true,
   },
@@ -26,7 +29,7 @@ const startGame = () => new Phaser.Game({
       debug: false,
     },
   },
-  scene: [StartScene, DifficultyScene, GameScene, BossScene, LevelCompleteScene, GameOverScene],
+  scene: [BootScene, DataScene, StartScene, DifficultyScene, CharacterScene, GameScene, BossScene, LevelCompleteScene, GameOverScene],
   scale: {
     mode: Phaser.Scale.ENVELOP,
     autoCenter: Phaser.Scale.CENTER_BOTH,

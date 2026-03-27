@@ -41,6 +41,7 @@ export class GameScene extends Phaser.Scene {
   private carSpawnerStarted = false;
   private bgTile!:          Phaser.GameObjects.TileSprite;
   private industrySky!:     Phaser.GameObjects.Rectangle;
+  private staticCarData:    { img: Phaser.GameObjects.Image; nextFire: number; heights: number[] }[] = [];
 
   constructor() { super("GameScene"); }
 
@@ -87,8 +88,12 @@ export class GameScene extends Phaser.Scene {
     this.jumpsAvailable       = 1;
     this.waveIndex            = 0;
 
+    this.sound.stopAll();
+    this.sound.play("mercury", { loop: true, volume: 0.6 });
+
     this.difficultyMultiplier = this.registry.get("difficultyMultiplier") ?? 1;
     this.carSpawnerStarted    = false;
+    this.staticCarData        = [];
 
     this.physics.world.setBounds(0, -800, LEVEL_WIDTH, 1520);
 
@@ -122,8 +127,6 @@ export class GameScene extends Phaser.Scene {
       this.onHit(damage);
     });
 
-
-    this.startPollutionSpawner();
 
     // ── Camera ────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, -800, LEVEL_WIDTH, 1520);
@@ -258,6 +261,18 @@ export class GameScene extends Phaser.Scene {
       if (p.x < -100 || p.x > LEVEL_WIDTH + 100 || p.y < -800) p.destroy();
     }
 
+    // ── Static car turrets ────────────────────────────────────────
+    const now = this.time.now;
+    for (const car of this.staticCarData) {
+      if (!car.img.active) continue;
+      const dist = this.player.x - car.img.x; // negative = player is left of car
+      if (dist > -950 && dist < 150 && now >= car.nextFire) {
+        car.nextFire = now + 2200 + Math.random() * 2000;
+        this.fireCarTurret(car.img.x, car.heights);
+        this.spawnCarExhaust(car.img.x + 30, car.img.y - 10);
+      }
+    }
+
 
     // ── Animation ─────────────────────────────────────────────────
     if (!onGround) {
@@ -338,6 +353,8 @@ export class GameScene extends Phaser.Scene {
     for (let x = 0; x < LEVEL_WIDTH; x += 64) {
       this.platforms.create(x + 32, GROUND_Y + 8, "sidewalk").setAlpha(0);
     }
+
+    this.placeStaticCars();
   }
 
 
@@ -799,6 +816,98 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(800,  spawnCar);
     this.time.delayedCall(2200, spawnCar);
     this.time.delayedCall(3800, spawnCar);
+  }
+
+  private placeStaticCars() {
+    const carDefs = [
+      { key: "veh_sedan",      scale: 3.2, yOff: 30 },
+      { key: "veh_sedan_blue", scale: 3.2, yOff: 30 },
+      { key: "veh_suv",        scale: 3.2, yOff: 32 },
+      { key: "veh_van",        scale: 3.5, yOff: 35 },
+      { key: "veh_bus",        scale: 3.8, yOff: 38 },
+      { key: "veh_truck",      scale: 3.8, yOff: 38 },
+      { key: "veh_truckdark",  scale: 3.8, yOff: 38 },
+    ];
+
+    const heightSets = [
+      [PROJ_LOW],
+      [PROJ_MID],
+      [PROJ_LOW, PROJ_MID],
+      [PROJ_HIGH, PROJ_LOW],
+      [PROJ_MID, PROJ_HIGH],
+    ];
+
+    const positions = [
+      TRANSITION_X + 300,
+      TRANSITION_X + 900,
+      TRANSITION_X + 1500,
+      TRANSITION_X + 2200,
+      TRANSITION_X + 2900,
+      INDUSTRY_X + 400,
+      INDUSTRY_X + 1000,
+      INDUSTRY_X + 1600,
+      INDUSTRY_X + 2200,
+      INDUSTRY_X + 2800,
+    ];
+
+    for (const x of positions) {
+      const def = carDefs[Math.floor(Math.random() * carDefs.length)];
+      const img = this.add.image(x, SIDEWALK_Y - def.yOff, def.key)
+        .setScale(def.scale)
+        .setDepth(3)
+        .setFlipX(true);
+      const heights = heightSets[Math.floor(Math.random() * heightSets.length)];
+      this.staticCarData.push({
+        img,
+        nextFire: this.time.now + 1500 + Math.random() * 3000,
+        heights,
+      });
+    }
+  }
+
+  private fireCarTurret(carX: number, heights: number[]) {
+    for (let i = 0; i < heights.length; i++) {
+      this.time.delayedCall(i * 220, () => {
+        if (this.levelComplete) return;
+        this.fireCarProjectile(carX - 20, heights[i]);
+      });
+    }
+  }
+
+  private fireCarProjectile(spawnX: number, targetY: number) {
+    const isPM25  = Math.random() < 0.4;
+    const radius  = isPM25 ? 7 : 15;
+    const color   = isPM25 ? 0x999999 : 0xbbbbbb;
+    const damage  = isPM25 ? 3 : 1;
+    const speed   = -(130 + Math.random() * 60) * this.projSpeedMult;
+    const spawnY  = targetY + (Math.random() * 30 - 15);
+
+    const key = `cproj_${Date.now()}_${Math.random()}`;
+    const gfx = this.make.graphics({ x: 0, y: 0 } as any);
+    gfx.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(35).color, 1);
+    gfx.fillCircle(radius, radius, radius);
+    gfx.fillStyle(color, 1);
+    gfx.fillCircle(radius, radius, radius * 0.62);
+    gfx.fillStyle(0xffffff, 0.3);
+    gfx.fillCircle(radius * 0.6, radius * 0.5, radius * 0.25);
+    gfx.generateTexture(key, radius * 2, radius * 2);
+    gfx.destroy();
+
+    const proj = this.projectiles.create(spawnX, spawnY, key) as Phaser.Physics.Arcade.Image;
+    proj.setDepth(4);
+    proj.setData("damage", damage);
+    (proj.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+    proj.setVelocity(speed, 0);
+
+    const floatAmp = isPM25 ? 35 : 22;
+    const floatDur = 1800 + Math.random() * 600;
+    this.tweens.add({
+      targets: proj, y: spawnY + floatAmp,
+      duration: floatDur, ease: "Sine.easeInOut",
+      yoyo: true, repeat: -1,
+    });
+    this.tweens.add({ targets: proj, angle: -360, duration: isPM25 ? 1200 : 2000, repeat: -1 });
+    proj.on("destroy", () => { if (this.textures.exists(key)) this.textures.remove(key); });
   }
 
   private spawnCarExhaust(x: number, y: number) {

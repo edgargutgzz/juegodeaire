@@ -8,6 +8,8 @@ export class BootScene extends Phaser.Scene {
     this.load.audio("sfx_typewriter", "/assets/sfx/typewriter.wav");
     this.load.audio("intro_jingle",   "/assets/sfx/intro_jingle.wav");
     this.load.audio("venus",          "/assets/sfx/venus.wav");
+    this.load.audio("sfx_select",     "/assets/sfx/vgmenuselect.ogg");
+    this.load.audio("mercury",        "/assets/sfx/mercury.wav");
   }
 
   create() {

@@ -54,7 +54,7 @@ export class StartScene extends Phaser.Scene {
     };
 
     // Línea 1 aparece a los 0.8s, línea 2 después, luego prompt
-    this.time.delayedCall(1200, () => {
+    this.time.delayedCall(700, () => {
       this.sound.play("venus", { loop: true, volume: 0.6 });
       flicker(line1, () => {
         this.time.delayedCall(400, () => {
@@ -65,8 +65,8 @@ export class StartScene extends Phaser.Scene {
                 targets: prompt, alpha: 0.15,
                 duration: 1200, ease: "Sine.easeInOut", yoyo: true, repeat: -1,
               });
-              this.input.keyboard!.once("keydown", () => { this.startGame(); });
-              this.input.gamepad!.once("down", () => { this.startGame(); });
+              this.input.keyboard!.once("keydown", () => { this.sound.play("sfx_select", { volume: 1.0 }); this.startGame(); });
+              this.input.gamepad!.once("down", () => { this.sound.play("sfx_select", { volume: 1.0 }); this.startGame(); });
             });
           });
         });
@@ -75,7 +75,6 @@ export class StartScene extends Phaser.Scene {
   }
 
   protected startGame() {
-    this.sound.stopAll();
     this.cameras.main.fadeOut(300, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("DifficultyScene"));
   }

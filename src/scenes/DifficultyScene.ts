@@ -1,186 +1,178 @@
 import Phaser from "phaser";
 
-const PROFILES = [
+// topPad centra verticalmente el bloque de contenido dentro de la card.
+// NORMAL tiene menos líneas que DIFICIL, así que necesita más padding superior.
+const OPTIONS = [
   {
-    key: "general",
-    label: "POBLACION GENERAL",
-    diffLabel: "FACIL",
-    bars: 1,
-    color: 0x44dd44,
-    desc: "La poblacion general es menos\nsensible a la contaminacion del aire.",
+    key: "normal",
+    label: "NORMAL",
+    group: "POBLACION GENERAL",
+    desc: "",
     multiplier: 0.5,
+    accentColor: 0x2ecc87,
+    accentHex: "#2ecc87",
+    bgSelected: 0x0e1a16,
+    bars: 9,
   },
   {
-    key: "ninos",
-    label: "NINOS MENORES DE 12",
-    diffLabel: "NORMAL",
+    key: "dificil",
+    label: "DIFICIL",
+    group: "POBLACION SENSIBLE",
+    desc: "• Ninos menores de 12\n• Adultos mayores\n• Mujeres embarazadas\n• Condiciones cardiovasculares\n  o respiratorias",
+    multiplier: 2.0,
+    accentColor: 0xff5533,
+    accentHex: "#ff5533",
+    bgSelected: 0x1a0e0b,
     bars: 3,
-    color: 0xbbcc00,
-    desc: "Los pulmones en desarrollo los hacen\nmas vulnerables al PM2.5 y ozono.",
-    multiplier: 1,
-  },
-  {
-    key: "mayores",
-    label: "ADULTOS MAYORES",
-    diffLabel: "DIFICIL",
-    bars: 5,
-    color: 0xffaa00,
-    desc: "El sistema inmune debilitado amplifica\nel riesgo ante particulas finas.",
-    multiplier: 1.5,
-  },
-  {
-    key: "embarazadas",
-    label: "MUJERES EMBARAZADAS",
-    diffLabel: "MUY DIFICIL",
-    bars: 8,
-    color: 0xff6600,
-    desc: "La contaminacion afecta tanto a la\nmadre como al bebe en desarrollo.",
-    multiplier: 2,
-  },
-  {
-    key: "respiratoria",
-    label: "COND. RESPIRATORIA",
-    diffLabel: "EXTREMO",
-    bars: 10,
-    color: 0xff2200,
-    desc: "Corazon y pulmones afectados\namplifican cada particula inhalada.",
-    multiplier: 3,
   },
 ] as const;
 
 export class DifficultyScene extends Phaser.Scene {
   private selected = 0;
   private confirmed = false;
-  private inputCooldown = 0;
   private inputEnabled = false;
-
+  private inputCooldown = 0;
   private pad: Phaser.Input.Gamepad.Gamepad | null = null;
-
-  private cursorArrows: Phaser.GameObjects.Text[] = [];
-  private rowHighlights: Phaser.GameObjects.Rectangle[] = [];
-  private barGraphics!: Phaser.GameObjects.Graphics;
-  private descText!: Phaser.GameObjects.Text;
+  private cardBgs: Phaser.GameObjects.Rectangle[] = [];
+  private cardBorders: Phaser.GameObjects.Graphics[] = [];
+  private flashTween: Phaser.Tweens.Tween | null = null;
 
   constructor() { super("DifficultyScene"); }
 
+  preload() {
+    this.load.audio("sfx_select", "/assets/sfx/vgmenuselect.ogg");
+  }
+
   create() {
-    // Reset state in case scene is restarted
     this.selected = 0;
     this.confirmed = false;
     this.inputEnabled = false;
     this.inputCooldown = 0;
-    this.cursorArrows = [];
-    this.rowHighlights = [];
+    this.cardBgs = [];
+    this.cardBorders = [];
+
+    if (!this.sound.get("venus")?.isPlaying) {
+      this.sound.play("venus", { loop: true, volume: 0.6 });
+    }
 
     const W = this.scale.width;
     const H = this.scale.height;
 
-    const bX = W * 0.08;
-    const bY = H * 0.05;
-    const bW = W * 0.84;
-    const bH = H * 0.90;
+    // ── Background ────────────────────────────────────────────────
+    this.add.rectangle(0, 0, W, H, 0x000000).setOrigin(0);
 
-    // Banner (same style as StartScene)
-    const bg = this.add.graphics();
-    bg.fillStyle(0x000000, 0.35);
-    bg.fillRect(bX + 6, bY + 6, bW, bH);
-    bg.fillGradientStyle(0x001833, 0x001833, 0x002f66, 0x002f66, 0.94);
-    bg.fillRect(bX, bY, bW, bH);
-    bg.lineStyle(4, 0x44aaff, 1);
-    bg.strokeRect(bX, bY, bW, bH);
-    bg.lineStyle(1.5, 0x1177dd, 0.6);
-    bg.strokeRect(bX + 6, bY + 6, bW - 12, bH - 12);
-
-    // Title
-    this.add.text(W / 2, bY + 32, "MODO DE DIFICULTAD", {
+    // ── Título ────────────────────────────────────────────────────
+    const titleText = this.add.text(W / 2, H * 0.055, "NIVEL DE DIFICULTAD", {
       fontSize: "22px", fontFamily: "'Press Start 2P'",
-      color: "#ffffff", stroke: "#003388", strokeThickness: 8,
+      color: "#ffffff",
     }).setOrigin(0.5, 0);
+    const titleGrad = titleText.context.createLinearGradient(0, 0, 0, titleText.height);
+    titleGrad.addColorStop(0, "#ffffff");
+    titleGrad.addColorStop(1, "#ff8833");
+    titleText.setFill(titleGrad);
 
-    // Subtitle
-    this.add.text(W / 2, bY + 70, "la calidad del aire no nos afecta a todos por igual", {
-      fontSize: "9px", fontFamily: "'Press Start 2P'",
-      color: "#88ccff",
-    }).setOrigin(0.5, 0);
+    // ── Cards ─────────────────────────────────────────────────────
+    const cardY  = H * 0.15;
+    const cardH  = H * 0.72;
+    const gap    = W * 0.04;
+    const margin = W * 0.06;
+    const cardW  = (W - margin * 2 - gap) / 2;
+    const cardX0 = margin;
 
-    // Separator
-    const sep = this.add.graphics();
-    sep.lineStyle(1, 0x1155aa, 0.6);
-    sep.lineBetween(bX + 14, bY + 92, bX + bW - 14, bY + 92);
+    OPTIONS.forEach((opt, i) => {
+      const cardX = cardX0 + i * (cardW + gap);
 
-    // Rows
-    const listX = bX + 46;
-    const listY = bY + 108;
-    const rowH = 66;
+      // Sombra
+      const shadow = this.add.graphics();
+      shadow.fillStyle(0x000000, 0.07);
+      shadow.fillRect(cardX + 5, cardY + 5, cardW, cardH);
 
-    this.barGraphics = this.add.graphics();
+      // Fondo card
+      const bg = this.add.rectangle(cardX, cardY, cardW, cardH, 0x111111).setOrigin(0);
+      this.cardBgs.push(bg);
 
-    PROFILES.forEach((p, i) => {
-      const ry = listY + i * rowH;
+      // Barra de color superior
+      this.add.rectangle(cardX, cardY, cardW, 5, opt.accentColor).setOrigin(0);
 
-      // Highlight
-      const hl = this.add.rectangle(W / 2, ry + rowH / 2 - 4, bW - 20, rowH - 8, 0x1155aa, 0);
-      this.rowHighlights.push(hl);
+      // Borde (se actualiza en updateUI)
+      const border = this.add.graphics();
+      this.cardBorders.push(border);
 
-      // Cursor arrow
-      const arrow = this.add.text(listX - 20, ry + 10, ">", {
-        fontSize: "14px", fontFamily: "'Press Start 2P'",
-        color: "#44aaff",
-      }).setAlpha(0);
-      this.cursorArrows.push(arrow);
+      // ── Contenido ───────────────────────────────────────────────
+      const cx    = Math.round(cardX + cardW / 2);
+      const baseY = Math.round(cardY + 40);
 
-      // Label
-      this.add.text(listX, ry + 10, p.label, {
-        fontSize: "14px", fontFamily: "'Press Start 2P'",
+      // Label de dificultad
+      this.add.text(cardX + 8, baseY, opt.label, {
+        fontSize: "28px", fontFamily: "'Press Start 2P'",
+        color: opt.accentHex,
+        fixedWidth: cardW - 8, align: "center",
+      }).setOrigin(0, 0);
+
+      // Subtítulo de grupo
+      this.add.text(cardX, baseY + 62, opt.group, {
+        fontSize: "9px", fontFamily: "'Press Start 2P'",
         color: "#ffffff",
-      });
+        fixedWidth: cardW, align: "center",
+      }).setOrigin(0, 0);
 
-      // Difficulty label (right-aligned)
-      this.add.text(bX + bW - 22, ry + 10, p.diffLabel, {
-        fontSize: "11px", fontFamily: "'Press Start 2P'",
-        color: "#" + p.color.toString(16).padStart(6, "0"),
-      }).setOrigin(1, 0);
+      // Separador
+      const sep = this.add.graphics();
+      sep.lineStyle(1, 0x222222, 1);
+      sep.lineBetween(cardX + 32, baseY + 90, cardX + cardW - 32, baseY + 90);
 
-      // Row divider
-      if (i < PROFILES.length - 1) {
-        const dv = this.add.graphics();
-        dv.lineStyle(1, 0x1155aa, 0.3);
-        dv.lineBetween(bX + 14, ry + rowH - 2, bX + bW - 14, ry + rowH - 2);
+      // ── Barra de resistencia estilo Mega Man ───────────────────
+      this.add.text(cardX, baseY + 130, "RESISTENCIA A LA CONTAMINACION", {
+        fontSize: "9px", fontFamily: "'Press Start 2P'",
+        color: "#ffffff",
+        fixedWidth: cardW, align: "center",
+      }).setOrigin(0, 0);
+
+      const SEG = 10;
+      const SW   = 36;
+      const SH   = 18;
+      const SGAP = 4;
+      const totalBarW = SEG * SW + (SEG - 1) * SGAP;
+      const barStartX = Math.round(cx - totalBarW / 2);
+      const barY = baseY + 152;
+
+      const barGfx = this.add.graphics();
+      for (let b = 0; b < SEG; b++) {
+        const filled = b < opt.bars;
+        barGfx.fillStyle(0x222222, 1);
+        barGfx.fillRect(barStartX + b * (SW + SGAP), barY, SW, SH);
+        if (filled) {
+          barGfx.fillStyle(opt.accentColor, 1);
+          barGfx.fillRect(barStartX + b * (SW + SGAP), barY, SW, SH);
+          barGfx.fillStyle(0xffffff, 0.35);
+          barGfx.fillRect(barStartX + b * (SW + SGAP) + 2, barY + 2, SW - 4, 5);
+        }
+        barGfx.lineStyle(1, 0x333333, 1);
+        barGfx.strokeRect(barStartX + b * (SW + SGAP), barY, SW, SH);
+      }
+
+      if (opt.desc) {
+        this.add.text(cardX, barY + SH + 80, opt.desc, {
+          fontSize: "11px", fontFamily: "'Press Start 2P'",
+          color: "#ffffff", lineSpacing: 14,
+          fixedWidth: cardW, align: "center",
+        }).setOrigin(0, 0);
       }
     });
 
-    // Description box
-    const descY = listY + PROFILES.length * rowH + 14;
-    const descBoxH = 76;
-    const descBox = this.add.graphics();
-    descBox.fillStyle(0x001133, 0.7);
-    descBox.lineStyle(1.5, 0x1177dd, 0.7);
-    descBox.fillRoundedRect(bX + 14, descY, bW - 28, descBoxH, 6);
-    descBox.strokeRoundedRect(bX + 14, descY, bW - 28, descBoxH, 6);
-
-    this.descText = this.add.text(W / 2, descY + descBoxH / 2, "", {
-      fontSize: "11px", fontFamily: "'Press Start 2P'",
-      color: "#aaddff", align: "center", lineSpacing: 10,
-    }).setOrigin(0.5);
-
-
-    // Input via events — simple and reliable
+    // ── Input ─────────────────────────────────────────────────────
     this.time.delayedCall(300, () => {
       this.inputEnabled = true;
-
       this.input.keyboard!.on("keydown", (e: KeyboardEvent) => {
         if (!this.inputEnabled || this.confirmed) return;
-        if (e.code === "ArrowUp") {
-          this.selected = (this.selected - 1 + PROFILES.length) % PROFILES.length;
-          this.updateUI();
-        } else if (e.code === "ArrowDown") {
-          this.selected = (this.selected + 1) % PROFILES.length;
-          this.updateUI();
+        if (e.code === "ArrowLeft" || e.code === "ArrowUp") {
+          this.selected = 0; this.sound.play("sfx_select", { volume: 1.0 }); this.updateUI();
+        } else if (e.code === "ArrowRight" || e.code === "ArrowDown") {
+          this.selected = 1; this.sound.play("sfx_select", { volume: 1.0 }); this.updateUI();
         } else if (e.code === "Enter" || e.code === "Space") {
           this.confirm();
         }
       });
-
       this.input.gamepad!.on("connected", (pad: Phaser.Input.Gamepad.Gamepad) => { this.pad = pad; });
       if (this.input.gamepad!.total > 0) this.pad = this.input.gamepad!.getPad(0);
     });
@@ -191,54 +183,59 @@ export class DifficultyScene extends Phaser.Scene {
 
   update(_t: number, delta: number) {
     if (this.confirmed || !this.inputEnabled) return;
-
-    // Gamepad navigation (polling)
     this.inputCooldown -= delta;
     if (this.inputCooldown > 0 || !this.pad) return;
 
-    const up = (this.pad.leftStick.y < -0.5) || this.pad.up;
-    const dn = (this.pad.leftStick.y > 0.5) || this.pad.down;
-    const btn = this.pad.buttons[0]?.pressed || this.pad.buttons[1]?.pressed;
+    const left  = (this.pad.leftStick.x < -0.5) || this.pad.left  || (this.pad.leftStick.y < -0.5) || this.pad.up;
+    const right = (this.pad.leftStick.x > 0.5)  || this.pad.right || (this.pad.leftStick.y > 0.5)  || this.pad.down;
+    const btn   = this.pad.buttons[0]?.pressed || this.pad.buttons[1]?.pressed;
 
     if (btn) { this.confirm(); return; }
-    if (up) { this.selected = (this.selected - 1 + PROFILES.length) % PROFILES.length; this.inputCooldown = 200; this.updateUI(); }
-    else if (dn) { this.selected = (this.selected + 1) % PROFILES.length; this.inputCooldown = 200; this.updateUI(); }
+    if (left)  { this.selected = 0; this.inputCooldown = 200; this.sound.play("sfx_select", { volume: 1.0 }); this.updateUI(); }
+    else if (right) { this.selected = 1; this.inputCooldown = 200; this.sound.play("sfx_select", { volume: 1.0 }); this.updateUI(); }
   }
 
   private updateUI() {
-    const SEG = 10;
-    const SW = 24;
-    const SH = 14;
-    const GAP = 4;
-    const listX = this.scale.width * 0.08 + 46;
-    const listY = this.scale.height * 0.05 + 108;
-    const rowH = 66;
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const cardY  = H * 0.15;
+    const cardH  = H * 0.72;
+    const gap    = W * 0.04;
+    const margin = W * 0.06;
+    const cardW  = (W - margin * 2 - gap) / 2;
+    const cardX0 = margin;
 
-    this.cursorArrows.forEach((a, i) => a.setAlpha(i === this.selected ? 1 : 0));
-    this.rowHighlights.forEach((r, i) => r.setFillStyle(0x1155aa, i === this.selected ? 0.3 : 0));
+    if (this.flashTween) { this.flashTween.stop(); this.flashTween = null; }
 
-    this.barGraphics.clear();
-    PROFILES.forEach((p, i) => {
-      const ry = listY + i * rowH;
-      const barY = ry + 38;
-      const isSelected = i === this.selected;
-      for (let b = 0; b < SEG; b++) {
-        const filled = b < p.bars;
-        this.barGraphics.fillStyle(filled ? p.color : 0x223344, isSelected ? 1 : (filled ? 0.5 : 0.25));
-        this.barGraphics.fillRect(listX + b * (SW + GAP), barY, SW, SH);
-      }
+    this.cardBgs.forEach((bg, i) => {
+      bg.setFillStyle(i === this.selected ? OPTIONS[i].bgSelected : 0x111111);
     });
 
-    this.descText.setText(PROFILES[this.selected].desc);
+    this.cardBorders.forEach((g, i) => {
+      g.clear();
+      const opt = OPTIONS[i];
+      const cardX = cardX0 + i * (cardW + gap);
+      const isSelected = i === this.selected;
+      g.lineStyle(isSelected ? 3 : 1, isSelected ? opt.accentColor : 0x333333, 1);
+      g.strokeRect(cardX, cardY, cardW, cardH);
+    });
+
+    const selBorder = this.cardBorders[this.selected];
+    this.flashTween = this.tweens.add({
+      targets: selBorder, alpha: 0.4,
+      duration: 500, ease: "Sine.easeInOut",
+      yoyo: true, repeat: -1,
+    });
   }
 
   private confirm() {
     if (this.confirmed) return;
     this.confirmed = true;
-    const p = PROFILES[this.selected];
-    this.registry.set("difficulty", p.key);
-    this.registry.set("difficultyMultiplier", p.multiplier);
+    this.sound.play("sfx_select", { volume: 1.0 });
+    const opt = OPTIONS[this.selected];
+    this.registry.set("difficulty", opt.key);
+    this.registry.set("difficultyMultiplier", opt.multiplier);
     this.cameras.main.fadeOut(400, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("GameScene"));
+    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("CharacterScene"));
   }
 }
