@@ -150,7 +150,7 @@ export class GameScene extends Phaser.Scene {
     this.createGoal(this.goalX);
 
     // ── Player ────────────────────────────────────────────────────
-    this.player = this.physics.add.sprite(200, GROUND_Y - 300, "char_idle");
+    this.player = this.physics.add.sprite(this.goalX - 800, GROUND_Y - 300, "char_idle");
     this.player.setCollideWorldBounds(true);
     this.player.setScale(0.85);
     this.player.setDepth(5);
