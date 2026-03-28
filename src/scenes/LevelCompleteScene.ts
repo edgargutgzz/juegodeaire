@@ -119,10 +119,7 @@ export class LevelCompleteScene extends Phaser.Scene {
         color: "#ffffff",
       }).setOrigin(0, 0).setDepth(4);
 
-      const grad = textObj.context.createLinearGradient(0, 0, 0, textObj.height || 24);
-      grad.addColorStop(0, "#ffffff");
-      grad.addColorStop(1, "#ff8833");
-      textObj.setFill(grad);
+      textObj.setColor("#ffffff");
 
       const text = line.text;
       let charIndex = 0;
@@ -144,11 +141,6 @@ export class LevelCompleteScene extends Phaser.Scene {
         const prompt = this.add.text(W / 2, H * 0.88, "PRESIONA PARA CONTINUAR", {
           fontSize: "14px", fontFamily: FONT, color: "#ffffff",
         }).setOrigin(0.5).setAlpha(0).setDepth(10);
-
-        const grad = prompt.context.createLinearGradient(0, 0, 0, prompt.height);
-        grad.addColorStop(0, "#ffffff");
-        grad.addColorStop(1, "#ff8833");
-        prompt.setFill(grad);
 
         this.tweens.add({ targets: prompt, alpha: 1, duration: 600 });
         this.tweens.add({ targets: prompt, alpha: 0.2, duration: 900,
