@@ -124,13 +124,12 @@ export class BossScene extends Phaser.Scene {
       .setScale(0.85).setDepth(10).setCollideWorldBounds(true);
     (this.player.body as Phaser.Physics.Arcade.Body).setSize(64, 88, false).setOffset(16, 20);
 
-    if (!this.anims.exists("walk")) {
-      this.anims.create({
-        key: "walk",
-        frames: Array.from({ length: 8 }, (_, i) => ({ key: `char_walk${i}` })),
-        frameRate: 12, repeat: -1,
-      });
-    }
+    if (this.anims.exists("walk")) this.anims.remove("walk");
+    this.anims.create({
+      key: "walk",
+      frames: Array.from({ length: 8 }, (_, i) => ({ key: `char_walk${i}` })),
+      frameRate: 12, repeat: -1,
+    });
 
     this.physics.add.collider(this.player, this.platforms);
     this.projectiles = this.physics.add.group();

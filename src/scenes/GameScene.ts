@@ -158,13 +158,12 @@ export class GameScene extends Phaser.Scene {
     body.setSize(64, 88, false);
     body.setOffset(16, 40);
 
-    if (!this.anims.exists("walk")) {
-      this.anims.create({
-        key: "walk",
-        frames: Array.from({ length: 8 }, (_, i) => ({ key: `char_walk${i}` })),
-        frameRate: 12, repeat: -1,
-      });
-    }
+    if (this.anims.exists("walk")) this.anims.remove("walk");
+    this.anims.create({
+      key: "walk",
+      frames: Array.from({ length: 8 }, (_, i) => ({ key: `char_walk${i}` })),
+      frameRate: 12, repeat: -1,
+    });
 
     this.physics.add.collider(this.player, this.platforms);
 
