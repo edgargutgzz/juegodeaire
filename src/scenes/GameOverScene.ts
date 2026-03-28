@@ -78,8 +78,8 @@ export class GameOverScene extends Phaser.Scene {
     this.inputCooldown -= delta;
     if (this.inputCooldown > 0) return;
 
-    const up   = this.pad.up   || (this.pad.leftStick.y < -0.5);
-    const down = this.pad.down || (this.pad.leftStick.y >  0.5);
+    const up   = this.pad.up;
+    const down = this.pad.down;
     const btn  = this.pad.buttons[0]?.pressed || this.pad.buttons[1]?.pressed;
 
     if (btn)  { this.confirm(); return; }

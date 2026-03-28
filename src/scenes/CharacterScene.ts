@@ -140,8 +140,8 @@ export class CharacterScene extends Phaser.Scene {
     this.inputCooldown -= delta;
     if (this.inputCooldown > 0 || !this.pad) return;
 
-    const left  = (this.pad.leftStick.x < -0.5) || this.pad.left  || (this.pad.leftStick.y < -0.5) || this.pad.up;
-    const right = (this.pad.leftStick.x > 0.5)  || this.pad.right || (this.pad.leftStick.y > 0.5)  || this.pad.down;
+    const left  = this.pad.left;
+    const right = this.pad.right;
     const btn   = this.pad.buttons[0]?.pressed || this.pad.buttons[1]?.pressed;
 
     if (btn) { this.confirm(); return; }

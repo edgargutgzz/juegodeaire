@@ -263,22 +263,17 @@ export class GameScene extends Phaser.Scene {
       this.jumpsAvailable = 1;
     }
 
-    const leftStickX = this.pad?.leftStick.x ?? 0;
-    const leftStickY = this.pad?.leftStick.y ?? 0;
-    const buttonA    = this.pad?.isButtonDown(0) ?? false;
-    const dpadUp     = (this.pad?.up ?? false) || leftStickY < -0.1;
-    const buttonAJust = buttonA && !this.wasButtonDown;
-    const dpadUpJust  = dpadUp && !this.wasDpadUp;
-    this.wasButtonDown = buttonA;
-    this.wasDpadUp     = dpadUp;
-    const dpadLeft   = this.pad?.left  ?? false;
-    const dpadRight  = this.pad?.right ?? false;
+    const buttonB     = this.pad?.isButtonDown(0) ?? false;
+    const buttonBJust = buttonB && !this.wasButtonDown;
+    this.wasButtonDown = buttonB;
+    const dpadLeft    = this.pad?.left  ?? false;
+    const dpadRight   = this.pad?.right ?? false;
 
-    const goLeft  = !this.cutsceneActive && (this.cursors.left.isDown  || leftStickX < -0.1 || dpadLeft);
-    const goRight = !this.cutsceneActive && (this.cursors.right.isDown || leftStickX >  0.1 || dpadRight);
-    const crouch  = !this.cutsceneActive && (this.cursors.down.isDown  || (this.pad?.down ?? false) || leftStickY > 0.1);
+    const goLeft  = !this.cutsceneActive && (this.cursors.left.isDown  || dpadLeft);
+    const goRight = !this.cutsceneActive && (this.cursors.right.isDown || dpadRight);
+    const crouch  = !this.cutsceneActive && (this.cursors.down.isDown  || (this.pad?.down ?? false));
     const jump    = !this.cutsceneActive && (Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
-                    Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonAJust || dpadUpJust);
+                    Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonBJust);
 
     // ── Crouch ────────────────────────────────────────────────────
     const body = this.player.body as Phaser.Physics.Arcade.Body;
