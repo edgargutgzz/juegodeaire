@@ -67,6 +67,7 @@ export class BossScene extends Phaser.Scene {
       ["sfx_gameover",   "/assets/sfx/SoundGameOver.wav"],
       ["sfx_death",      "/assets/sfx/SoundDeath.wav"],
       ["boss_theme",     "/assets/sfx/BossMain.wav"],
+      ["winneris",       "/assets/sfx/winneris.ogg"],
     ];
     for (const [key, path] of sfxMap) {
       if (!this.cache.audio.exists(key)) this.load.audio(key, path);
@@ -938,8 +939,11 @@ export class BossScene extends Phaser.Scene {
 
     this.time.delayedCall(2500, () => {
       this.sound.stopAll();
-      this.cameras.main.fadeOut(1200, 0, 0, 0);
-      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("LevelCompleteScene"));
+      this.sfx("winneris", 0.8);
+      this.time.delayedCall(4000, () => {
+        this.cameras.main.fadeOut(1200, 0, 0, 0);
+        this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("LevelCompleteScene"));
+      });
     });
   }
 
