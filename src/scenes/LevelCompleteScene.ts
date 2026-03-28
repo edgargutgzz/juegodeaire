@@ -10,15 +10,9 @@ const LINES: { text: string; gap?: boolean; big?: boolean }[] = [
   { text: "Llegaste a casa.", big: true },
   { text: "", gap: true },
   { text: "", gap: true },
-  { text: "Hoy sobreviviste." },
+  { text: "Las montañas siguen ahí," },
   { text: "", gap: true },
-  { text: "Pero en el AMM, el 60% de los dias" },
-  { text: "tienen mala calidad del aire." },
-  { text: "", gap: true },
-  { text: "3,000 muertes prematuras cada año." },
-  { text: "", gap: true },
-  { text: "El smog no descansa." },
-  { text: "Pero tampoco tú." },
+  { text: "esperando ser vistas." },
 ];
 
 export class LevelCompleteScene extends Phaser.Scene {
