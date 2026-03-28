@@ -87,14 +87,15 @@ export class BossScene extends Phaser.Scene {
         this.load.image(`expl_${i}`, `/assets/particles/explosion/explosion0${i}.png`);
     }
     const character = this.registry.get("character") || "maleAdventurer";
-    if (!this.textures.exists("char_idle")) {
-      this.load.image("char_idle", `/assets/character/character_${character}_idle.png`);
-      this.load.image("char_jump", `/assets/character/character_${character}_jump.png`);
-      this.load.image("char_fall", `/assets/character/character_${character}_fall.png`);
-      this.load.image("char_duck", `/assets/character/character_${character}_duck.png`);
-      for (let i = 0; i < 8; i++)
-        this.load.image(`char_walk${i}`, `/assets/character/character_${character}_walk${i}.png`);
-    }
+    const charKeys = ["char_idle", "char_jump", "char_fall", "char_duck",
+      ...Array.from({ length: 8 }, (_, i) => `char_walk${i}`)];
+    charKeys.forEach(k => { if (this.textures.exists(k)) this.textures.remove(k); });
+    this.load.image("char_idle", `/assets/character/character_${character}_idle.png`);
+    this.load.image("char_jump", `/assets/character/character_${character}_jump.png`);
+    this.load.image("char_fall", `/assets/character/character_${character}_fall.png`);
+    this.load.image("char_duck", `/assets/character/character_${character}_duck.png`);
+    for (let i = 0; i < 8; i++)
+      this.load.image(`char_walk${i}`, `/assets/character/character_${character}_walk${i}.png`);
   }
 
   create() {

@@ -60,6 +60,12 @@ export class GameScene extends Phaser.Scene {
       femaleAdventurer: "maleAdventurer",
     };
     const otherChar = otherMap[character] ?? "femalePerson";
+
+    // Remove cached char textures so Phaser re-loads them for the selected character
+    const charKeys = ["char_idle", "char_jump", "char_fall", "char_duck", "other_idle",
+      ...Array.from({ length: 8 }, (_, i) => `char_walk${i}`)];
+    charKeys.forEach(k => { if (this.textures.exists(k)) this.textures.remove(k); });
+
     this.load.image("other_idle", `/assets/character/character_${otherChar}_idle.png`);
 
     this.load.image("char_idle", `/assets/character/character_${character}_idle.png`);
