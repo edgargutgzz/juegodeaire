@@ -56,7 +56,7 @@ export class BossScene extends Phaser.Scene {
 
   preload() {
     const sfxMap: [string, string][] = [
-      ["sfx_jump",       "/assets/sfx/SoundJump1.wav"],
+      ["sfx_jump",       "/assets/sfx/SoundJump2.wav"],
       ["sfx_land",       "/assets/sfx/SoundLand1.wav"],
       ["sfx_hit",        "/assets/sfx/SoundPlayerHit.wav"],
       ["sfx_hit_female", "/assets/sfx/sfx_hit_female.ogg"],
@@ -183,7 +183,7 @@ export class BossScene extends Phaser.Scene {
 
     // "WARNING" text slams in
     this.time.delayedCall(1400, () => {
-      const warn = this.add.text(W / 2, H * 0.38, "⚠ WARNING ⚠", {
+      const warn = this.add.text(W / 2, H * 0.38, "⚠ PELIGRO ⚠", {
         fontSize: "28px", fontFamily: "'Press Start 2P'",
         color: "#ffcc00", stroke: "#000000", strokeThickness: 8,
       }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(2);
@@ -271,7 +271,7 @@ export class BossScene extends Phaser.Scene {
 
     const onGround = this.player.body!.blocked.down;
     if (onGround) {
-      if (!this.wasOnGround) this.sfx("sfx_land", 0.4);
+      if (!this.wasOnGround) { /* sin sonido de aterrizaje */ }
       this.jumpsAvailable = 1;
     }
     this.wasOnGround = onGround;
@@ -528,7 +528,7 @@ export class BossScene extends Phaser.Scene {
   private drawBossBar(fraction: number) {
     const bw = W * 0.66;
     const bx = W / 2 - bw / 2;
-    const by = 78;
+    const by = 55;
     const bh = 14;
     this.bossBarGfx.clear();
     this.bossBarGfx.fillStyle(0x330000, 1);
@@ -543,9 +543,58 @@ export class BossScene extends Phaser.Scene {
   private drawHealthBar() {
     this.healthBarGfx.clear();
 
-    // ── Pixel heart ───────────────────────────────────────────────
+    // ── Vertical segmented bar ─────────────────────────────────────
+    const segments = 10;
+    const segH = 22, segW = 28;
+    const barX = 16, barY = 30;
+    const barW = segW, barH = segH * segments;
+    const border = 3, corner = 5, ic = corner - border;
+
+    let hi: number, lo: number;
+    if (this.health >= 7)      { hi = 0x44cc55; lo = 0x228833; }
+    else if (this.health >= 4) { hi = 0xffbb00; lo = 0xcc7700; }
+    else                       { hi = 0xee3311; lo = 0xaa1100; }
+
+    // Border outline
+    const bx = barX - border, by = barY - border;
+    const bw = barW + border * 2, bh = barH + border * 2;
+    const step = corner - border;
+    this.healthBarGfx.fillStyle(0x000000, 1);
+    this.healthBarGfx.fillRect(bx + corner,       by,                  bw - corner * 2, border);
+    this.healthBarGfx.fillRect(bx + corner,       by + bh - border,    bw - corner * 2, border);
+    this.healthBarGfx.fillRect(bx,                by + corner,         border, bh - corner * 2);
+    this.healthBarGfx.fillRect(bx + bw - border,  by + corner,         border, bh - corner * 2);
+    this.healthBarGfx.fillRect(bx + border,             by + border,             step, step);
+    this.healthBarGfx.fillRect(bx + bw - border - step, by + border,             step, step);
+    this.healthBarGfx.fillRect(bx + border,             by + bh - border - step, step, step);
+    this.healthBarGfx.fillRect(bx + bw - border - step, by + bh - border - step, step, step);
+
+    // Segments drawn top→bottom, filled from top
+    for (let i = 0; i < segments; i++) {
+      const sy = barY + i * segH;
+      const clipT = i === 0            ? ic : 0;
+      const clipB = i === segments - 1 ? ic : 0;
+      const adjH  = segH - clipT - clipB;
+      if (i >= segments - this.health) {
+        // Left half (lighter) — outer edge strip (clipped) + inner full-height area
+        this.healthBarGfx.fillStyle(hi, 1);
+        this.healthBarGfx.fillRect(barX,           sy + clipT, ic,            adjH); // outer strip, clipped
+        this.healthBarGfx.fillRect(barX + ic,      sy,         barW / 2 - ic, segH); // inner, full height
+        // Right half (darker) — inner full-height area + outer edge strip (clipped)
+        this.healthBarGfx.fillStyle(lo, 1);
+        this.healthBarGfx.fillRect(barX + barW / 2, sy,          barW / 2 - ic, segH); // inner, full height
+        this.healthBarGfx.fillRect(barX + barW - ic, sy + clipT, ic,            adjH); // outer strip, clipped
+      }
+    }
+    // Segment dividers
+    this.healthBarGfx.fillStyle(0x000000, 1);
+    for (let i = 1; i < segments; i++)
+      this.healthBarGfx.fillRect(barX, barY + i * segH - 1, barW, 2);
+
+    // ── Pixel heart (below the bar) ────────────────────────────────
     const px = 5;
-    const hx = 16, hy = 28;
+    const hx = barX + barW / 2 - (7 * px) / 2;
+    const hy = barY + barH + 10;
     const heart = [
       [0,1,1,0,1,1,0],
       [1,1,1,1,1,1,1],
@@ -563,52 +612,11 @@ export class BossScene extends Phaser.Scene {
       for (let c = 0; c < heart[r].length; c++)
         if (heart[r][c]) this.healthBarGfx.fillRect(hx + c * px, hy + r * px, px, px);
     this.healthBarGfx.fillStyle(0xff6666, 1);
-    this.healthBarGfx.fillRect(hx + 1 * px, hy + 0 * px, px, px);
-    this.healthBarGfx.fillRect(hx + 4 * px, hy + 0 * px, px, px);
+    this.healthBarGfx.fillRect(hx + 1 * px, hy, px, px);
+    this.healthBarGfx.fillRect(hx + 4 * px, hy, px, px);
     this.healthBarGfx.fillStyle(0xffffff, 0.7);
-    this.healthBarGfx.fillRect(hx + 1 * px, hy + 0 * px, 3, 3);
-    this.healthBarGfx.fillRect(hx + 4 * px, hy + 0 * px, 3, 3);
-
-    // ── Segmented bar ─────────────────────────────────────────────
-    const segments = 10;
-    const heartW = 7 * px;
-    const barX = hx + heartW + 18, barH = 22, barW = 230;
-    const barY = hy + (heart.length * px - barH) / 2;
-    const border = 3, corner = 5, ic = corner - border;
-    const segW = barW / segments;
-
-    let hi: number, lo: number;
-    if (this.health >= 7)      { hi = 0x44cc55; lo = 0x228833; }
-    else if (this.health >= 4) { hi = 0xffbb00; lo = 0xcc7700; }
-    else                       { hi = 0xee3311; lo = 0xaa1100; }
-
-    const bx = barX - border, by = barY - border, bw = barW + border * 2, bh = barH + border * 2;
-    const step = corner - border;
-    this.healthBarGfx.fillStyle(0x000000, 1);
-    this.healthBarGfx.fillRect(bx + corner,        by,                  bw - corner * 2, border);
-    this.healthBarGfx.fillRect(bx + corner,        by + bh - border,    bw - corner * 2, border);
-    this.healthBarGfx.fillRect(bx,                 by + corner,         border, bh - corner * 2);
-    this.healthBarGfx.fillRect(bx + bw - border,   by + corner,         border, bh - corner * 2);
-    this.healthBarGfx.fillRect(bx + border,              by + border,             step, step);
-    this.healthBarGfx.fillRect(bx + bw - border - step,  by + border,             step, step);
-    this.healthBarGfx.fillRect(bx + border,              by + bh - border - step, step, step);
-    this.healthBarGfx.fillRect(bx + bw - border - step,  by + bh - border - step, step, step);
-
-    for (let i = 0; i < this.health; i++) {
-      const sx = barX + i * segW;
-      const clipL = i === 0            ? ic : 0;
-      const clipR = i === segments - 1 ? ic : 0;
-      const adjW  = segW - clipL - clipR;
-      this.healthBarGfx.fillStyle(hi, 1);
-      this.healthBarGfx.fillRect(sx + clipL, barY,        adjW, ic);
-      this.healthBarGfx.fillRect(sx,         barY + ic,   segW, barH / 2 - ic);
-      this.healthBarGfx.fillStyle(lo, 1);
-      this.healthBarGfx.fillRect(sx,         barY + barH / 2,      segW, barH / 2 - ic);
-      this.healthBarGfx.fillRect(sx + clipL, barY + barH - ic,     adjW, ic);
-    }
-    this.healthBarGfx.fillStyle(0x000000, 1);
-    for (let i = 1; i < segments; i++)
-      this.healthBarGfx.fillRect(barX + i * segW - 1, barY, 2, barH);
+    this.healthBarGfx.fillRect(hx + 1 * px, hy, 3, 3);
+    this.healthBarGfx.fillRect(hx + 4 * px, hy, 3, 3);
 
     if (this.health <= 2 && !this.criticalTween) {
       this.criticalTween = this.tweens.add({
@@ -663,7 +671,7 @@ export class BossScene extends Phaser.Scene {
       const elapsed  = this.time.now - this.startTime;
       const phase    = Math.min(3, Math.floor(elapsed / 15000));
       // Spawn interval shrinks per phase
-      const interval = [2000, 1400, 1000, 700][phase];
+      const interval = [2400, 1900, 1500, 1200][phase];
 
       this.time.delayedCall(interval, () => {
         if (this.levelComplete) return;
@@ -715,34 +723,20 @@ export class BossScene extends Phaser.Scene {
 
     } else {
       // Phase 4: full chaos
-      if (roll < 0.2) {
-        this.fireRain(6);
-      } else if (roll < 0.4) {
-        this.fireHorizontal("left",  LOW);
-        this.fireHorizontal("right", LOW);
-        this.time.delayedCall(200, () => {
-          this.fireHorizontal("left",  HIGH);
-          this.fireHorizontal("right", HIGH);
-        });
-      } else if (roll < 0.6) {
-        this.fireDiagonal("top-left");
-        this.fireDiagonal("top-right");
-        this.time.delayedCall(300, () => this.fireFromTop(W / 2));
-      } else if (roll < 0.8) {
-        this.fireRain(3);
-        this.time.delayedCall(400, () => {
-          this.fireHorizontal("left",  MID);
-          this.fireHorizontal("right", MID);
-        });
-      } else {
-        // Wall of fire - everything at once
+      if (roll < 0.25) {
+        this.fireRain(4);
+      } else if (roll < 0.5) {
         this.fireHorizontal("left",  LOW);
         this.fireHorizontal("right", HIGH);
+        this.time.delayedCall(300, () => this.fireFromTop(W / 2));
+      } else if (roll < 0.75) {
         this.fireDiagonal("top-left");
-        this.time.delayedCall(350, () => {
-          this.fireHorizontal("left",  HIGH);
-          this.fireHorizontal("right", LOW);
-          this.fireDiagonal("top-right");
+        this.time.delayedCall(350, () => this.fireDiagonal("top-right"));
+      } else {
+        this.fireRain(3);
+        this.time.delayedCall(500, () => {
+          this.fireHorizontal("left",  MID);
+          this.fireHorizontal("right", MID);
         });
       }
     }
@@ -750,7 +744,7 @@ export class BossScene extends Phaser.Scene {
 
   private fireHorizontal(from: "left" | "right", y: number) {
     const elapsed  = this.time.now - this.startTime;
-    const speedMul = 1 + (elapsed / BOSS_DURATION) * 0.9;
+    const speedMul = 1 + (elapsed / BOSS_DURATION) * 0.5;
     const baseSpd  = 280;
     const spawnX   = from === "left" ? -30 : W + 30;
     const velX     = from === "left" ? baseSpd * speedMul : -baseSpd * speedMul;
@@ -763,7 +757,7 @@ export class BossScene extends Phaser.Scene {
 
   private fireDiagonal(from: "top-left" | "top-right") {
     const elapsed  = this.time.now - this.startTime;
-    const speedMul = 1 + (elapsed / BOSS_DURATION) * 0.7;
+    const speedMul = 1 + (elapsed / BOSS_DURATION) * 0.4;
     const spd = 240 * speedMul;
     const x   = from === "top-left" ? -30 : W + 30;
     const vx  = from === "top-left" ?  spd : -spd;
@@ -797,6 +791,27 @@ export class BossScene extends Phaser.Scene {
     pb.setAllowGravity(gravity);
     proj.setVelocity(vx, vy);
     this.tweens.add({ targets: proj, angle: 360, duration: 700, repeat: -1 });
+
+    // Efecto de viento: oscilación sinusoidal
+    {
+      let t = Phaser.Math.FloatBetween(0, Math.PI * 2); // fase aleatoria
+      const windTimer = this.time.addEvent({
+        delay: 50, loop: true,
+        callback: () => {
+          if (!proj.active) { windTimer.remove(); return; }
+          t += 0.18;
+          const body = proj.body as Phaser.Physics.Arcade.Body;
+          if (gravity) {
+            // Caen desde arriba: deriva horizontal
+            body.setVelocityX(vx + Math.sin(t) * 35);
+          } else {
+            // Horizontales/diagonales: deriva vertical
+            body.setVelocityY(vy + Math.sin(t) * 45);
+          }
+        },
+      });
+    }
+
     proj.on("destroy", () => { if (this.textures.exists(key)) this.textures.remove(key); });
   }
 
