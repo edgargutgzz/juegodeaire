@@ -119,10 +119,11 @@ export class GameOverScene extends Phaser.Scene {
     if (this.cache.audio.exists("sfx_select")) this.sound.play("sfx_select", { volume: 1.0 });
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", () => {
+      this.sound.stopAll();
       if (OPTIONS[this.selected].key === "level") {
         this.scene.start(this.from);
       } else {
-        this.scene.start("DataScene");
+        this.scene.start("BootScene");
       }
     });
   }
