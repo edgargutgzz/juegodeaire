@@ -38,14 +38,27 @@ export class GameScene extends Phaser.Scene {
   private smogOverlay!:   Phaser.GameObjects.Rectangle;
   private vignetteRect!:  Phaser.GameObjects.Rectangle;
 
+  private bgTile!:          Phaser.GameObjects.TileSprite;
+  private urbanSkyOverlay!: Phaser.GameObjects.Rectangle;
   private waveIndex         = 0;
   private carSpawnerStarted = false;
+  private newsBannerShown   = false;
+  private cutsceneActive    = false;
   private staticCarData:    { img: Phaser.GameObjects.Image; nextFire: number; heights: number[] }[] = [];
 
   constructor() { super("GameScene"); }
 
   preload() {
     const character = this.registry.get("character") || "maleAdventurer";
+    const otherMap: Record<string, string> = {
+      malePerson:       "femalePerson",
+      femalePerson:     "malePerson",
+      maleAdventurer:   "femaleAdventurer",
+      femaleAdventurer: "maleAdventurer",
+    };
+    const otherChar = otherMap[character] ?? "femalePerson";
+    this.load.image("other_idle", `/assets/character/character_${otherChar}_idle.png`);
+
     this.load.image("char_idle", `/assets/character/character_${character}_idle.png`);
     this.load.image("char_jump", `/assets/character/character_${character}_jump.png`);
     this.load.image("char_fall", `/assets/character/character_${character}_fall.png`);
@@ -71,7 +84,12 @@ export class GameScene extends Phaser.Scene {
 
     for (const v of ["sedan","sedan_blue","bus","truck","van","suv","truck_trailer","truckdark"])
       this.load.image(`veh_${v}`, `/assets/vehicles/${v}.png`);
-    // this.load.audio("sfx_jump",       "/assets/sfx/SoundJump1.wav");
+    this.load.audio("sfx_jump1",  "/assets/sfx/SoundJump1.wav");
+    this.load.audio("sfx_jump2",  "/assets/sfx/SoundJump2.wav");
+    this.load.audio("sfx_crouch", "/assets/sfx/sfx_dive.wav");
+    this.load.audio("sfx_siren",       "/assets/sfx/siren.mp3");
+    this.load.audio("danger_sequence", "/assets/sfx/danger_sequence.ogg");
+    this.load.audio("sfx_typewriter",  "/assets/sfx/typewriter.wav");
     // this.load.audio("sfx_hit",        "/assets/sfx/SoundPlayerHit.wav");
     // this.load.audio("sfx_explode",    "/assets/sfx/SoundExplosionSmall.wav");
     // this.load.audio("sfx_goal",       "/assets/sfx/SoundReachGoal.wav");
@@ -88,7 +106,6 @@ export class GameScene extends Phaser.Scene {
     this.waveIndex            = 0;
 
     this.sound.stopAll();
-    this.sound.play("arcade_puzzler", { loop: true, volume: 0.6 });
 
     this.difficultyMultiplier = this.registry.get("difficultyMultiplier") ?? 1;
     this.carSpawnerStarted    = false;
@@ -126,12 +143,15 @@ export class GameScene extends Phaser.Scene {
       this.onHit(damage);
     });
 
-
     // ── Camera ────────────────────────────────────────────────────
     this.cameras.main.setBounds(0, -800, LEVEL_WIDTH, 1520);
     this.cameras.main.startFollow(this.player, true, 0.15, 0);
     this.cameras.main.scrollY = 0;
-    this.cameras.main.fadeIn(500, 212, 234, 247);
+    this.cameras.main.fadeOut(0, 0, 0, 0);
+    this.time.delayedCall(1500, () => {
+      this.sound.play("nature_sketch", { loop: true, volume: 0.6 });
+      this.cameras.main.fadeIn(600, 0, 0, 0);
+    });
 
     // ── Drop-in ───────────────────────────────────────────────────
     this.player.setVisible(false);
@@ -142,7 +162,7 @@ export class GameScene extends Phaser.Scene {
         if (this.player.body!.blocked.down) {
           checkLanding.remove();
           this.player.setVisible(true);
-          this.time.delayedCall(200, () => { this.showBriefing(); });
+          this.time.delayedCall(200, () => { this.levelComplete = false; });
         }
       },
     });
@@ -184,11 +204,23 @@ export class GameScene extends Phaser.Scene {
 
     if (this.levelComplete) return;
 
-    // Trigger car spawner when entering industry zone
-    if (!this.carSpawnerStarted && this.player.x >= INDUSTRY_X) {
-      this.carSpawnerStarted = true;
-      this.startCarSpawner();
+    // Parallax bosque
+    this.bgTile.tilePositionX = this.cameras.main.scrollX * 0.2;
+    // Cielo se vuelve gris al entrar a la ciudad
+    const cityAlpha = Phaser.Math.Clamp((this.player.x - TRANSITION_X) / 1200, 0, 0.6);
+    this.urbanSkyOverlay.setAlpha(cityAlpha);
+
+    // Noticiero al entrar a la ciudad
+    if (!this.newsBannerShown && this.player.x >= TRANSITION_X + 1200) {
+      this.newsBannerShown = true;
+      this.showNewsBanner();
     }
+
+    // Trigger car spawner when entering industry zone
+    // if (!this.carSpawnerStarted && this.player.x >= INDUSTRY_X) {
+    //   this.carSpawnerStarted = true;
+    //   this.startCarSpawner();
+    // }
 
     const onGround   = this.player.body!.blocked.down;
     if (onGround) {
@@ -206,11 +238,11 @@ export class GameScene extends Phaser.Scene {
     const dpadLeft   = this.pad?.left  ?? false;
     const dpadRight  = this.pad?.right ?? false;
 
-    const goLeft  = this.cursors.left.isDown  || leftStickX < -0.1 || dpadLeft;
-    const goRight = this.cursors.right.isDown || leftStickX >  0.1 || dpadRight;
-    const crouch  = this.cursors.down.isDown  || (this.pad?.down ?? false) || leftStickY > 0.1;
-    const jump    = Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
-                    Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonAJust || dpadUpJust;
+    const goLeft  = !this.cutsceneActive && (this.cursors.left.isDown  || leftStickX < -0.1 || dpadLeft);
+    const goRight = !this.cutsceneActive && (this.cursors.right.isDown || leftStickX >  0.1 || dpadRight);
+    const crouch  = !this.cutsceneActive && (this.cursors.down.isDown  || (this.pad?.down ?? false) || leftStickY > 0.1);
+    const jump    = !this.cutsceneActive && (Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
+                    Phaser.Input.Keyboard.JustDown(this.cursors.space!) || buttonAJust || dpadUpJust);
 
     // ── Crouch ────────────────────────────────────────────────────
     const body = this.player.body as Phaser.Physics.Arcade.Body;
@@ -247,7 +279,7 @@ export class GameScene extends Phaser.Scene {
 
     if (jump && this.jumpsAvailable > 0 && !this.isCrouching) {
       this.player.setVelocityY(-520);
-      this.sfx("sfx_jump", 0.6);
+      this.sfx("sfx_jump2", 0.6);
       this.jumpsAvailable--;
     }
 
@@ -313,10 +345,21 @@ export class GameScene extends Phaser.Scene {
   private buildWorld() {
     this.drawCityBackground();
 
-    // ── Ground visuals (cemento a lo largo de todo el nivel) ──────
-    this.add.rectangle(LEVEL_WIDTH / 2, SIDEWALK_Y + 100, LEVEL_WIDTH, 200, 0x8a9fa0).setDepth(0);
-    this.add.tileSprite(0, SIDEWALK_Y - 2, LEVEL_WIDTH, 202, "asphalt_fill").setOrigin(0, 0).setDepth(1);
-    this.add.tileSprite(0, SIDEWALK_Y, LEVEL_WIDTH, 70, "asphalt_top").setOrigin(0, 1).setDepth(2);
+    // ── Ground visuals ────────────────────────────────────────────
+    const grassW   = TRANSITION_X;
+    const asphaltW = LEVEL_WIDTH - TRANSITION_X;
+
+    // Solid base fills
+    this.add.rectangle(TRANSITION_X / 2, SIDEWALK_Y + 100, grassW, 200, 0xc8904c).setDepth(0);
+    this.add.rectangle(TRANSITION_X + asphaltW / 2, SIDEWALK_Y + 100, asphaltW, 200, 0x8a9fa0).setDepth(0);
+
+    // Ground fills
+    this.add.tileSprite(0, SIDEWALK_Y - 2, grassW, 202, "ground_fill").setOrigin(0, 0).setDepth(1);
+    this.add.tileSprite(TRANSITION_X, SIDEWALK_Y - 2, asphaltW, 202, "asphalt_fill").setOrigin(0, 0).setDepth(1);
+
+    // Ground tops
+    this.add.tileSprite(0, SIDEWALK_Y, grassW, 70, "ground_top").setOrigin(0, 1).setDepth(2);
+    this.add.tileSprite(TRANSITION_X, SIDEWALK_Y, asphaltW, 70, "asphalt_top").setOrigin(0, 1).setDepth(2);
 
     // Road markings in industry zone
     const dashG = this.add.graphics().setDepth(2);
@@ -341,7 +384,7 @@ export class GameScene extends Phaser.Scene {
       this.platforms.create(x + 32, GROUND_Y + 8, "sidewalk").setAlpha(0);
     }
 
-    this.placeStaticCars();
+    // this.placeStaticCars();
   }
 
 
@@ -372,9 +415,15 @@ export class GameScene extends Phaser.Scene {
   private drawCityBackground() {
     const W = this.scale.width;
     const H = this.scale.height;
-    // Cielo azul plano
+    // Cielo azul base
     this.add.rectangle(W / 2, H / 2, W, H, 0x87ceeb)
       .setScrollFactor(0).setDepth(-3);
+    // Bosque parallax
+    this.bgTile = this.add.tileSprite(0, -100, W, H, "bg_talltrees")
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(-2);
+    // Overlay cielo urbano (gris) — encima del bosque, se funde al entrar a la ciudad
+    this.urbanSkyOverlay = this.add.rectangle(W / 2, H / 2, W, H, 0x8899a0)
+      .setScrollFactor(0).setDepth(-1).setAlpha(0);
   }
 
   // ── Pollution spawner (speed ramps with distance) ─────────────────
@@ -600,8 +649,8 @@ export class GameScene extends Phaser.Scene {
 
 
 
-  private sfx(_key: string, _volume = 1) {
-    // if (this.cache.audio.exists(_key)) this.sound.play(_key, { volume: _volume });
+  private sfx(key: string, volume = 1) {
+    if (this.cache.audio.exists(key)) this.sound.play(key, { volume });
   }
 
   private showBriefing() {
@@ -733,6 +782,165 @@ export class GameScene extends Phaser.Scene {
   // Briefing dismiss hooks for update()
   private _briefingDismiss: (() => void) | null = null;
   private _briefingInputEnabled: (() => boolean) | null = null;
+
+  private showOtherCharMessage() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+
+    const boxH = H * 0.30;
+    const boxY = H - boxH * 0.5 - H * 0.04;
+    const boxX = W * 0.04;
+    const boxW = W * 0.92;
+    const accent = 0xff5533;
+    const accentHex = "#ff5533";
+
+    const dimmer = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.5)
+      .setScrollFactor(0).setDepth(30).setAlpha(0);
+    const boxBg = this.add.rectangle(boxX + boxW / 2, boxY, boxW, boxH, 0x0a0a0a, 0.96)
+      .setScrollFactor(0).setDepth(31);
+    const boxBorder = this.add.graphics().setScrollFactor(0).setDepth(32);
+    boxBorder.lineStyle(2, accent, 1);
+    boxBorder.strokeRect(boxX, boxY - boxH / 2, boxW, boxH);
+    const accentBar = this.add.rectangle(boxX + boxW / 2, boxY - boxH / 2, boxW, 3, accent, 1)
+      .setScrollFactor(0).setDepth(32);
+
+    // Portrait del otro personaje
+    const portraitSize = boxH * 0.75;
+    const portraitX = boxX + portraitSize * 0.56;
+    const portrait = this.add.image(portraitX, boxY, "other_idle")
+      .setScrollFactor(0).setDepth(33).setScale(portraitSize / 128);
+
+    // Línea separadora
+    const sepX = portraitX + portraitSize * 0.56;
+    const lineG = this.add.graphics().setScrollFactor(0).setDepth(32);
+    lineG.lineStyle(1, accent, 0.4);
+    lineG.lineBetween(sepX, boxY - boxH / 2 + 10, sepX, boxY + boxH / 2 - 10);
+
+
+    // Texto con typewriter
+    const MESSAGE = [
+      "¿DONDE ESTAS?",
+      "",
+      "EL AIRE ESTA MUY CONTAMINADO HOY.",
+      "",
+      "LLEGA A CASA CUANTO ANTES,",
+      "AQUI TE ESPERO.",
+      "",
+      "¡TEN CUIDADO!",
+    ];
+    const textObj = this.add.text(sepX + W * 0.03, boxY - boxH / 2 + 18, "", {
+      fontSize: "13px", fontFamily: "'Press Start 2P'",
+      color: "#cccccc", wordWrap: { width: boxX + boxW - sepX - W * 0.06 }, lineSpacing: 6,
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(33);
+
+
+    // Fade in
+    this.tweens.add({ targets: dimmer, alpha: 1, duration: 300 });
+
+    // Typewriter
+    const fullText = MESSAGE.join("\n");
+    let i = 0;
+    const typeSound = this.sound.add("sfx_typewriter", { loop: true, volume: 0.35 });
+    const typeChar = () => {
+      if (i >= fullText.length) {
+        typeSound.stop();
+        const dismiss = () => {
+          this.tweens.add({
+            targets: [dimmer, boxBg, boxBorder, portrait, lineG, textObj],
+            alpha: 0, duration: 500,
+            onComplete: () => {
+              [dimmer, boxBg, boxBorder, accentBar, portrait, lineG, textObj].forEach(o => o.destroy());
+              this.cutsceneActive = false;
+            },
+          });
+        };
+        this.time.delayedCall(300, () => {
+          this.input.keyboard!.once("keydown", dismiss);
+          this.input.gamepad!.once("down", dismiss);
+        });
+        return;
+      }
+      const ch = fullText[i];
+      if (ch !== "\n" && !typeSound.isPlaying) typeSound.play();
+      if (ch === "\n") typeSound.stop();
+      textObj.setText(fullText.slice(0, ++i));
+      this.time.delayedCall(45, typeChar);
+    };
+    this.time.delayedCall(300, typeChar);
+  }
+
+  private showNewsBanner() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const bannerY = H - 100;
+
+    // Congelar player
+    this.cutsceneActive = true;
+    this.player.setAccelerationX(0);
+    this.player.setVelocityX(0);
+    this.player.anims.stop();
+    this.player.setTexture("char_idle");
+
+    // Animación de sorpresa: sacudida rápida izquierda-derecha
+    this.tweens.add({
+      targets: this.player,
+      x: this.player.x - 8,
+      duration: 60, yoyo: true, repeat: 5,
+      ease: "Sine.easeInOut",
+    });
+
+    // Flash rojo + terremoto
+    this.cameras.main.flash(180, 255, 0, 0);
+    this.cameras.main.shake(600, 0.022);
+    this.time.delayedCall(220, () => {
+      this.cameras.main.flash(180, 255, 0, 0);
+      this.cameras.main.shake(400, 0.015);
+    });
+
+    // Fade música anterior
+    const music = this.sound.get("nature_sketch");
+    if (music) this.tweens.add({ targets: music, volume: 0, duration: 800, onComplete: () => music.stop() });
+    this.sfx("sfx_siren", 0.5);
+
+    // Fondo rojo "BREAKING NEWS"
+    const redBar = this.add.rectangle(0, bannerY - 18, W, 28, 0xcc0000, 1)
+      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(30).setAlpha(0);
+    const breakingLabel = this.add.text(16, bannerY - 18, "⚠ ALERTA POR CONTINGENCIA AMBIENTAL", {
+      fontSize: "13px", fontFamily: "'Press Start 2P'", color: "#ffffff",
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31).setAlpha(0);
+
+    // Ticker negro con el mensaje
+    const tickerBg = this.add.rectangle(0, bannerY + 14, W, 28, 0x111111, 0.92)
+      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(30).setAlpha(0);
+    const tickerText = this.add.text(W, bannerY + 14,
+      "SE RECOMIENDA NO REALIZAR ACTIVIDADES AL AIRE LIBRE  •  PERMANEZCA EN INTERIORES", {
+      fontSize: "11px", fontFamily: "'Press Start 2P'", color: "#ffff00",
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31).setAlpha(0);
+
+    // Fade in
+    this.tweens.add({ targets: [redBar, breakingLabel, tickerBg, tickerText], alpha: 1, duration: 300 });
+
+    // Ticker scrolling
+    this.tweens.add({
+      targets: tickerText,
+      x: -tickerText.width - 20,
+      duration: 18000,
+      ease: "Linear",
+    });
+
+    // Fade out banner, sirena y liberar player
+    this.time.delayedCall(9000, () => {
+      this.tweens.add({
+        targets: [redBar, breakingLabel, tickerBg, tickerText],
+        alpha: 0, duration: 600,
+        onComplete: () => [redBar, breakingLabel, tickerBg, tickerText].forEach(o => o.destroy()),
+      });
+      const siren = this.sound.get("sfx_siren");
+      if (siren) this.tweens.add({ targets: siren, volume: 0, duration: 800, onComplete: () => siren.stop() });
+      this.sound.play("danger_sequence", { loop: true, volume: 0.6 });
+      this.time.delayedCall(600, () => this.showOtherCharMessage());
+    });
+  }
 
   private drawHealthBar() {
     this.healthBar.clear();

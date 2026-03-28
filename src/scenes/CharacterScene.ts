@@ -56,6 +56,7 @@ export class CharacterScene extends Phaser.Scene {
     this.charImages = [];
     this.animFrame = 0;
 
+
     const W = this.scale.width;
     const H = this.scale.height;
 
@@ -209,12 +210,14 @@ export class CharacterScene extends Phaser.Scene {
 
     const music = this.sound.get("venus");
     if (music) {
-      this.tweens.add({ targets: music, volume: 0, duration: 1200, onComplete: () => {
+      this.tweens.add({ targets: music, volume: 0, duration: 600 });
+    }
+    this.time.delayedCall(300, () => {
+      this.cameras.main.fadeOut(400, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
         this.sound.stopAll();
         this.scene.start("GameScene");
-      }});
-    } else {
-      this.scene.start("GameScene");
-    }
+      });
+    });
   }
 }

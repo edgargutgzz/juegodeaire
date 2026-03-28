@@ -11,6 +11,7 @@ export class BootScene extends Phaser.Scene {
     this.load.audio("sfx_select",     "/assets/sfx/vgmenuselect.ogg");
     this.load.audio("mercury",        "/assets/sfx/mercury.wav");
     this.load.audio("arcade_puzzler", "/assets/sfx/arcade_puzzler.ogg");
+    this.load.audio("nature_sketch",  "/assets/sfx/nature_sketch.wav");
   }
 
   create() {
@@ -34,7 +35,7 @@ export class BootScene extends Phaser.Scene {
     const advance = () => {
       this.sound.play("intro_jingle", { loop: false, volume: 0.6 });
       this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("DataScene"));
+      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("StartScene"));
     };
 
     this.input.keyboard!.once("keydown", advance);

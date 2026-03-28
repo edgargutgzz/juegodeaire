@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 
 const BG_COLOR   = 0x000000;
-const TEXT_COLOR = "#66ffdd";
+const TEXT_COLOR = "#ffffff";
 const FONT       = "'Press Start 2P'";
 const FONT_SIZE  = "20px";
 const LINE_H     = 52;
@@ -11,33 +11,30 @@ const LINE_PAUSE = 220;
 const FLASH_DELAY = 8000;
 
 const LINES: { text: string; gap?: boolean }[] = [
-  { text: "AREA METROPOLITANA DE MONTERREY" },
+  { text: "AREA METROPOLITANA DE MONTERREY (AMM)" },
   { text: "", gap: true },
-  { text: "POBLACION:  5,341,171 HABITANTES" },
+  { text: "POBLACION:  5,341,171 PERSONAS" },
   { text: "AREA:       6,679 KM2" },
   { text: "", gap: true },
   { text: "", gap: true },
   { text: "RODEADA POR LA SIERRA MADRE, EL AMM ES CONOCIDA COMO" },
-  { text: "LA CIUDAD DE LAS MONTANAS." },
-  { text: "", gap: true },
+  { text: "LA CIUDAD DE LAS MONTAÑAS." },
   { text: "", gap: true },
   { text: "PERO HAY DIAS EN QUE LAS MISMAS DESAPARECEN" },
   { text: "POR COMPLETO." },
   { text: "", gap: true },
   { text: "", gap: true },
   { text: "EL AIRE AQUI SUPERA 4 VECES LA RECOMENDACION" },
-  { text: "SALUDABLE DE PARTICULAS RESPIRABLES PM2.5 DE LA OMS." },
+  { text: "SALUDABLE DE PARTICULAS RESPIRABLES PM2.5" },
+  { text: "DE LA ORGANIZACION MUNDIAL DE LA SALUD." },
   { text: "", gap: true },
   { text: "", gap: true },
-  { text: "ESTO CUESTA CADA ANO CERCA DE 3,000 VIDAS PERDIDAS." },
+  { text: "ESTO SE TRADUCE EN 3,000 MUERTES PREMATURAS CADA AÑO." },
   { text: "", gap: true },
   { text: "", gap: true },
-  { text: "SOLO EN ENERO Y FEBRERO DE 2026," },
-  { text: "SE HAN REGISTRADO 36 DIAS CON MALA CALIDAD DEL AIRE." },
-  { text: "", gap: true },
-  { text: "", gap: true },
-  { text: "", gap: true },
-  { text: "CUANDO EL SMOG ES TAN DENSO..." },
+  { text: "SOLO EN ENERO Y FEBRERO DE 2026:" },
+  { text: "EL 60% DE LOS DIAS SE HAN REGISTRADO CON" },
+  { text: "MALA CALIDAD DEL AIRE." },
 ];
 
 export class DataScene extends Phaser.Scene {
@@ -78,7 +75,7 @@ export class DataScene extends Phaser.Scene {
     };
 
     // ── Cursor parpadeante ────────────────────────────────────────
-    const cursor = this.add.rectangle(startX, paddingTop, 18, 24, 0x66ffdd, 1)
+    const cursor = this.add.rectangle(startX, paddingTop, 18, 24, 0xff8833, 1)
       .setOrigin(0, 0).setVisible(false).setDepth(5);
     this.tweens.add({
       targets: cursor, alpha: 0,
@@ -119,6 +116,10 @@ export class DataScene extends Phaser.Scene {
         fontSize: FONT_SIZE, fontFamily: FONT,
         color: TEXT_COLOR,
       }).setOrigin(0, 0).setDepth(4);
+      const grad = textObj.context.createLinearGradient(0, 0, 0, textObj.height || 24);
+      grad.addColorStop(0, "#ffffff");
+      grad.addColorStop(1, "#ff8833");
+      textObj.setFill(grad);
       lineObjects.push(textObj);
 
       cursor.setPosition(startX, posY + 4).setVisible(true);
@@ -145,7 +146,34 @@ export class DataScene extends Phaser.Scene {
 
     // ── Prompt final ──────────────────────────────────────────────
     const showPrompt = () => {
-      this.time.delayedCall(4500, () => this.advance());
+      // Fade to black, then show centered closing line
+      this.time.delayedCall(1200, () => {
+        this.cameras.main.fadeOut(800, 0, 0, 0);
+        this.cameras.main.once("camerafadeoutcomplete", () => {
+          // Destroy all scrolling text
+          lineObjects.forEach(o => o.destroy());
+          cursor.destroy();
+
+          const closing = this.add.text(W / 2, H / 2, "CUANDO EL SMOG ES TAN DENSO...", {
+            fontSize: FONT_SIZE, fontFamily: FONT,
+            color: TEXT_COLOR, align: "center",
+          }).setOrigin(0.5).setAlpha(0).setDepth(10);
+          const closingGrad = closing.context.createLinearGradient(0, 0, 0, closing.height);
+          closingGrad.addColorStop(0, "#ffffff");
+          closingGrad.addColorStop(1, "#ff8833");
+          closing.setFill(closingGrad);
+
+          this.time.delayedCall(2000, () => {
+            this.cameras.main.fadeIn(600, 0, 0, 0);
+            this.tweens.add({
+              targets: closing, alpha: 1,
+              duration: 600, ease: "Sine.easeIn",
+            });
+          });
+
+          this.time.delayedCall(5000, () => this.advance());
+        });
+      });
     };
   }
 
