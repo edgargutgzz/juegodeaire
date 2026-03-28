@@ -208,25 +208,70 @@ export class LevelCompleteScene extends Phaser.Scene {
   private showFinish() {
     this.typeSound.stop();
 
-    // Pausa de 3s con el último mensaje visible, luego fade out del dialog box
+    // Pausa 3s → todo a negro de golpe → créditos
     this.time.delayedCall(3000, () => {
-      [this.dimmer, this.boxBg, this.boxBorder, this.accentBar,
-       this.portrait, this.lineG, this.textObj, this.promptText].forEach(o =>
-        this.tweens.add({ targets: o, alpha: 0, duration: 800 })
-      );
-
-      // Música se apaga mientras el cuarto sigue visible
-      const music = this.sound.getAll("end_theme").find(s => s.isPlaying) ?? this.sound.get("end_theme");
-      if (music) this.tweens.add({ targets: music, volume: 0, duration: 2500 });
-
-      // Fade a negro después de que desaparece el dialog
-      this.time.delayedCall(2800, () => {
-        this.cameras.main.fadeOut(1800, 0, 0, 0);
-        this.cameras.main.once("camerafadeoutcomplete", () => {
-          this.sound.stopAll();
-          this.scene.start("BootScene");
-        });
+      this.cameras.main.fadeOut(1200, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.showCredits();
       });
+    });
+  }
+
+  private showCredits() {
+    const cx = W / 2;
+
+    const lines: { text: string; size: string; alpha: number }[] = [
+      { text: "",                                          size: "12px", alpha: 1    },
+      { text: "UN JUEGO DE",                              size: "11px", alpha: 0.6  },
+      { text: "Edgar Gutiérrez González",                 size: "16px", alpha: 1    },
+      { text: "",                                         size: "12px", alpha: 1    },
+      { text: "",                                         size: "12px", alpha: 1    },
+      { text: "AGRADECIMIENTO ESPECIAL",                  size: "11px", alpha: 0.6  },
+      { text: "Observatorio Ciudadano de la",             size: "14px", alpha: 1    },
+      { text: "Calidad del Aire de Monterrey",            size: "14px", alpha: 1    },
+      { text: "OCCAMM",                                   size: "18px", alpha: 1    },
+    ];
+
+    const lineH  = 48;
+    const startY = H + 40;
+    const endY   = -lineH * lines.length - 40;
+    const totalTravel = startY - endY;
+    const scrollDuration = totalTravel * 22; // ~22ms per px
+
+    const container = this.add.container(cx, startY).setDepth(50);
+
+    let y = 0;
+    for (const l of lines) {
+      if (l.text === "") { y += lineH * 0.5; continue; }
+      const t = this.add.text(0, y, l.text, {
+        fontSize: l.size, fontFamily: FONT, color: "#ffffff", align: "center",
+      }).setOrigin(0.5, 0).setAlpha(l.alpha);
+      container.add(t);
+      y += lineH;
+    }
+
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000).setDepth(49);
+
+    this.cameras.main.fadeIn(800, 0, 0, 0);
+
+    this.tweens.add({
+      targets: container,
+      y: endY,
+      duration: scrollDuration,
+      ease: "Linear",
+    });
+
+    this.time.delayedCall(15000, () => {
+      const music = this.sound.getAll("end_theme").find(s => s.isPlaying) ?? this.sound.get("end_theme");
+      if (music) {
+        this.tweens.add({
+          targets: music, volume: 0, duration: 1500,
+          onComplete: () => { this.sound.stopAll(); this.scene.start("BootScene"); },
+        });
+      } else {
+        this.sound.stopAll();
+        this.scene.start("BootScene");
+      }
     });
   }
 }
