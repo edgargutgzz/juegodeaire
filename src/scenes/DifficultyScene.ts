@@ -7,23 +7,25 @@ const OPTIONS = [
     key: "normal",
     label: "NORMAL",
     group: "POBLACION GENERAL",
+    barLabel: "MENOR RIESGO A LA CONTAMINACION",
     desc: "",
     multiplier: 0.5,
     accentColor: 0x2ecc87,
     accentHex: "#2ecc87",
     bgSelected: 0x0e1a16,
-    bars: 9,
+    bars: 3,
   },
   {
     key: "dificil",
     label: "DIFICIL",
     group: "POBLACION SENSIBLE",
+    barLabel: "MAYOR RIESGO A LA CONTAMINACION",
     desc: "• Ninos menores de 12\n• Adultos mayores\n• Mujeres embarazadas\n• Condiciones cardiovasculares\n  o respiratorias",
     multiplier: 0.85,
     accentColor: 0xff5533,
     accentHex: "#ff5533",
     bgSelected: 0x1a0e0b,
-    bars: 3,
+    bars: 9,
   },
 ] as const;
 
@@ -122,33 +124,28 @@ export class DifficultyScene extends Phaser.Scene {
       sep.lineBetween(cardX + 32, baseY + 90, cardX + cardW - 32, baseY + 90);
 
       // ── Barra de resistencia estilo Mega Man ───────────────────
-      this.add.text(cardX, baseY + 130, "RESISTENCIA A LA CONTAMINACION", {
-        fontSize: "9px", fontFamily: "'Press Start 2P'",
+      this.add.text(cardX, baseY + 110, opt.barLabel, {
+        fontSize: "11px", fontFamily: "'Press Start 2P'",
         color: "#ffffff",
-        fixedWidth: cardW, align: "center",
+        wordWrap: { width: cardW * 0.92 }, align: "center", lineSpacing: 6,
+        fixedWidth: cardW,
       }).setOrigin(0, 0);
 
       const SEG = 10;
-      const SW   = 36;
-      const SH   = 18;
-      const SGAP = 4;
-      const totalBarW = SEG * SW + (SEG - 1) * SGAP;
-      const barStartX = Math.round(cx - totalBarW / 2);
+      const skullSize = 28;
+      const skullGap  = 8;
+      const totalSkullW = SEG * skullSize + (SEG - 1) * skullGap;
+      const skullStartX = Math.round(cx - totalSkullW / 2);
       const barY = baseY + 152;
 
-      const barGfx = this.add.graphics();
       for (let b = 0; b < SEG; b++) {
         const filled = b < opt.bars;
-        barGfx.fillStyle(0x222222, 1);
-        barGfx.fillRect(barStartX + b * (SW + SGAP), barY, SW, SH);
-        if (filled) {
-          barGfx.fillStyle(opt.accentColor, 1);
-          barGfx.fillRect(barStartX + b * (SW + SGAP), barY, SW, SH);
-          barGfx.fillStyle(0xffffff, 0.35);
-          barGfx.fillRect(barStartX + b * (SW + SGAP) + 2, barY + 2, SW - 4, 5);
-        }
-        barGfx.lineStyle(1, 0x333333, 1);
-        barGfx.strokeRect(barStartX + b * (SW + SGAP), barY, SW, SH);
+        const sx = skullStartX + b * (skullSize + skullGap);
+        this.add.text(sx + skullSize / 2, barY + skullSize / 2, "🤧", {
+          fontSize: `${skullSize}px`, fontFamily: "serif",
+          color: filled ? opt.accentHex : "#333333",
+          align: "center",
+        }).setOrigin(0.5, 0.5).setAlpha(filled ? 1 : 0.3);
       }
 
       if (opt.key === "dificil") {
@@ -157,7 +154,7 @@ export class DifficultyScene extends Phaser.Scene {
         const tagH = 48;
         const tagGapX = cardW * 0.06;
         const tagGapY = 14;
-        const startY = barY + SH + 90;
+        const startY = barY + skullSize + 90;
         const col0X = cardX + cardW * 0.04;
         const col1X = col0X + tagW + tagGapX;
 
