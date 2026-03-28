@@ -834,6 +834,8 @@ export class GameScene extends Phaser.Scene {
       this.levelComplete = true;
       this.cameras.main.fadeOut(800, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.sound.stopByKey("sfx_hit_female");
+        this.sound.stopByKey("sfx_hit_male");
         this.scene.start("GameOverScene", { from: "GameScene" });
       });
       return;

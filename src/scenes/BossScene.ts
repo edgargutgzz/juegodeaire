@@ -899,7 +899,11 @@ export class BossScene extends Phaser.Scene {
     if (this.health <= 0) {
       this.levelComplete = true;
       this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("GameOverScene", { from: "BossScene" }));
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        this.sound.stopByKey("sfx_hit_female");
+        this.sound.stopByKey("sfx_hit_male");
+        this.scene.start("GameOverScene", { from: "BossScene" });
+      });
       return;
     }
 
