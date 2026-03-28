@@ -35,7 +35,8 @@ export class BossScene extends Phaser.Scene {
   private wasButtonDown = false;
   private wasDpadUp     = false;
 
-  private health        = 10;
+  private health               = 10;
+  private difficultyMultiplier = 1;
   private invincible    = false;
   private isCrouching   = false;
   private jumpsAvailable = 1;
@@ -99,9 +100,10 @@ export class BossScene extends Phaser.Scene {
   }
 
   create() {
-    this.levelComplete   = false;
-    this.health          = 10;
-    this.invincible      = false;
+    this.levelComplete        = false;
+    this.health               = 10;
+    this.difficultyMultiplier = this.registry.get("difficultyMultiplier") ?? 1;
+    this.invincible           = false;
     this.isCrouching     = false;
     this.jumpsAvailable  = 1;
     this.wasOnGround     = false;
@@ -866,7 +868,7 @@ export class BossScene extends Phaser.Scene {
   private onHit() {
     if (this.invincible || this.levelComplete) return;
     this.invincible = true;
-    this.health     = Math.max(0, this.health - 1);
+    this.health     = Math.max(0, this.health - 1 * this.difficultyMultiplier);
     this.drawHealthBar();
     const character = this.registry.get("character") as string ?? "";
     const isFemale  = character.toLowerCase().includes("female");
