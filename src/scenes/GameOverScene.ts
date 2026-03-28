@@ -5,8 +5,8 @@ const W      = 1280;
 const H      = 720;
 
 const OPTIONS = [
-  { label: "REINICIAR NIVEL", key: "level" },
-  { label: "IR AL INICIO",    key: "start" },
+  { label: "OTRA VEZ",  key: "level" },
+  { label: "RENDIRSE",  key: "start" },
 ] as const;
 
 export class GameOverScene extends Phaser.Scene {
