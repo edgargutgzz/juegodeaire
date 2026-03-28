@@ -835,7 +835,7 @@ export class GameScene extends Phaser.Scene {
       this.sfx("sfx_death", 0.8);
       this.cameras.main.fadeOut(800, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => {
-        this.scene.start("StartScene");
+        this.scene.start("GameOverScene", { from: "GameScene" });
       });
       return;
     }

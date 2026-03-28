@@ -902,7 +902,7 @@ export class BossScene extends Phaser.Scene {
       // this.sound.stopByKey("bossbattle");
       this.time.delayedCall(600, () => this.sfx("sfx_gameover", 0.8));
       this.cameras.main.fadeOut(900, 0, 0, 0);
-      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("GameOverScene"));
+      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("GameOverScene", { from: "BossScene" }));
       return;
     }
 
