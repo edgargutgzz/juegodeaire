@@ -73,16 +73,6 @@ export class LevelCompleteScene extends Phaser.Scene {
     winG.fillStyle(0xf0e8d8, 1);
     winG.fillRect(winX - 10, winY + winH, winW + 20, 14);
 
-    // Ceiling lamp
-    const lampG = this.add.graphics();
-    lampG.fillStyle(0x3a2010, 1);
-    lampG.fillRect(W * 0.3 - 2, 0, 4, 40);
-    lampG.fillStyle(0xf0d090, 1);
-    lampG.fillTriangle(W * 0.3 - 28, 40, W * 0.3 + 28, 40, W * 0.3, 80);
-    // Lamp glow
-    const glow = this.add.rectangle(W * 0.3, 80, 300, 200, 0xffe0a0).setOrigin(0.5, 0).setAlpha(0.08);
-    this.tweens.add({ targets: glow, alpha: 0.15, duration: 2500, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-
     // Wall shadow at top
     this.add.rectangle(W / 2, 0, W, 30, 0x000000).setOrigin(0.5, 0).setAlpha(0.25);
 
