@@ -2,8 +2,8 @@ import Phaser from "phaser";
 
 const SIDEWALK_Y  = 660;
 const GROUND_Y    = SIDEWALK_Y - 70; // visual top of grass tile = 610
-const LEVEL_WIDTH   = 15800;
-const REFINERY_X    = 13000; // donde paran autos y fábricas
+const LEVEL_WIDTH   = 19800;
+const REFINERY_X    = 17000; // donde paran autos y fábricas
 
 const TRANSITION_X  = 3200; // bosque → ciudad
 const INDUSTRY_X    = 6400; // ciudad → ciudad+autos+industria
@@ -1375,6 +1375,9 @@ export class GameScene extends Phaser.Scene {
       INDUSTRY_X + 1600,
       INDUSTRY_X + 2200,
       INDUSTRY_X + 2800,
+      INDUSTRY_X + 3500,
+      INDUSTRY_X + 4200,
+      INDUSTRY_X + 5000,
     ];
 
     for (const x of positions) {
@@ -1447,7 +1450,9 @@ export class GameScene extends Phaser.Scene {
       [7800,  3500, 4,   0.2, 1.3], // 2ª — normal
       [8200,  2000, 4,  -0.5, 1.6], // 3ª — grande
       [10500, 1600, 4,   0.0, 1.5], // 4ª — mediana
-      [12000, 1200, 6,  -0.4, 1.8], // 5ª — muy grande, última
+      [12000, 1200, 6,  -0.4, 1.8], // 5ª — muy grande
+      [13500, 1400, 5,   0.3, 1.5], // 6ª
+      [14500, 1100, 6,  -0.3, 1.7], // 7ª — última antes de refinería
     ];
     for (let i = 0; i < factories.length; i++) {
       const [x, fireDelay, ballCount, vyBoost, scale] = factories[i];
