@@ -78,7 +78,7 @@ export class LevelCompleteScene extends Phaser.Scene {
 
     // ── Characters (standing on floor) ────────────────────────────
     const charY = FLOOR_Y;
-    const charCX = W * 0.42;
+    const charCX = W * 0.22;
 
     if (this.textures.exists("char_idle")) {
       this.add.image(charCX - 70, charY, "char_idle")
@@ -90,7 +90,7 @@ export class LevelCompleteScene extends Phaser.Scene {
     }
 
     // ── Typewriter text (right panel) ─────────────────────────────
-    const startX = W * 0.55;
+    const startX = W * 0.38;
     const startY = H * 0.08;
     const LINE_H = 44;
     const GAP_H  = 22;
