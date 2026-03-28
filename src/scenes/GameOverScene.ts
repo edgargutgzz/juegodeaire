@@ -32,11 +32,7 @@ export class GameOverScene extends Phaser.Scene {
 
   create() {
     // ── Background ────────────────────────────────────────────────
-    this.add.rectangle(W / 2, H / 2, W, H, 0x0a0a0a);
-
-    // Smog overlay
-    const smog = this.add.rectangle(W / 2, H / 2, W, H, 0xcc5500).setAlpha(0.08);
-    this.tweens.add({ targets: smog, alpha: 0.18, duration: 3000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    this.add.rectangle(W / 2, H / 2, W, H, 0x000000);
 
     // ── Options ───────────────────────────────────────────────────
     const baseY = H * 0.45;
@@ -47,12 +43,17 @@ export class GameOverScene extends Phaser.Scene {
         fontSize: "22px", fontFamily: FONT,
         color: "#ffffff",
       }).setOrigin(0.5).setAlpha(0);
+      // Intro-style white→orange gradient
+      const grad = t.context.createLinearGradient(0, 0, 0, t.height || 24);
+      grad.addColorStop(0, "#ffffff");
+      grad.addColorStop(1, "#ff8833");
+      t.setFill(grad);
       this.optionTexts.push(t);
-      this.tweens.add({ targets: t, alpha: 1, duration: 400, delay: 500 + i * 120 });
+      this.tweens.add({ targets: t, alpha: 1, duration: 400, delay: 300 + i * 120 });
     });
 
     // Cursor arrow (left of options)
-    this.time.delayedCall(700, () => {
+    this.time.delayedCall(500, () => {
       this.updateUI();
     });
 
@@ -95,10 +96,19 @@ export class GameOverScene extends Phaser.Scene {
 
   private updateUI() {
     this.optionTexts.forEach((t, i) => {
+      const label = OPTIONS[i].label;
       if (i === this.selected) {
-        t.setColor("#ffdd00").setText("> " + OPTIONS[i].label);
+        t.setText("> " + label).setAlpha(1);
+        const grad = t.context.createLinearGradient(0, 0, 0, t.height || 24);
+        grad.addColorStop(0, "#ffffff");
+        grad.addColorStop(1, "#ff8833");
+        t.setFill(grad);
       } else {
-        t.setColor("#555555").setText("  " + OPTIONS[i].label);
+        t.setText("  " + label).setAlpha(0.35);
+        const grad = t.context.createLinearGradient(0, 0, 0, t.height || 24);
+        grad.addColorStop(0, "#ffffff");
+        grad.addColorStop(1, "#ff8833");
+        t.setFill(grad);
       }
     });
   }
