@@ -771,7 +771,7 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0xcc2200, 1);
     g.fillRect(signX + 2, signY + 2, signW - 4, 3);
     g.fillRect(signX + 2, signY + signH - 5, signW - 4, 3);
-    this.add.text(signX + signW / 2, signY + signH / 2, "COMBUSTIBLES\nSA DE CV", {
+    this.add.text(signX + signW / 2, signY + signH / 2, "FABRICA DE\nCOMBUSTIBLES", {
       fontSize: "13px", fontFamily: "'Press Start 2P'", color: "#ff4400",
       align: "center", lineSpacing: 6,
     }).setOrigin(0.5).setDepth(3);
