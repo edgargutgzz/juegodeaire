@@ -38,6 +38,7 @@ export class GameScene extends Phaser.Scene {
   private criticalTween:  Phaser.Tweens.Tween | null = null;
   private smogOverlay!:   Phaser.GameObjects.Rectangle;
   private vignetteRect!:  Phaser.GameObjects.Rectangle;
+  private hitFlashRect!:  Phaser.GameObjects.Rectangle;
 
   private bgTile!:          Phaser.GameObjects.TileSprite;
   private urbanSkyOverlay!: Phaser.GameObjects.Rectangle;
@@ -222,6 +223,9 @@ export class GameScene extends Phaser.Scene {
       this.scale.width, this.scale.height,
       0xff0000, 0,
     ).setScrollFactor(0).setDepth(11);
+
+    // ── Hit flash overlay on player (Canvas-compatible tint replacement) ──
+    this.hitFlashRect = this.add.rectangle(0, 0, 96, 128, 0xff4444, 0).setDepth(10);
 
     // ── Input ─────────────────────────────────────────────────────
     this.cursors  = this.input.keyboard!.createCursorKeys();
@@ -813,7 +817,8 @@ export class GameScene extends Phaser.Scene {
       const cutoff = isFemale ? 1000 : 800;
       this.time.delayedCall(cutoff, () => { if (hitSfx.isPlaying) hitSfx.stop(); hitSfx.destroy(); });
     }
-    this.player.setTint(0xff4444);
+    this.hitFlashRect.setPosition(this.player.x, this.player.y).setAlpha(0.55);
+    this.tweens.add({ targets: this.hitFlashRect, alpha: 0, duration: 350, ease: "Quad.Out" });
     this.tweens.add({
       targets: this.player, x: this.player.x - 6,
       duration: 50, yoyo: true, repeat: 3, ease: "Sine.easeInOut",
@@ -845,7 +850,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.time.delayedCall(800, () => {
-      this.player.clearTint();
       this.invincible = false;
     });
   }
