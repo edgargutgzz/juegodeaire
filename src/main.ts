@@ -10,12 +10,13 @@ import { LevelCompleteScene } from "./scenes/LevelCompleteScene";
 import { GameOverScene } from "./scenes/GameOverScene";
 
 const startGame = () => new Phaser.Game({
-  type: Phaser.CANVAS,
+  type: Phaser.AUTO,
   width: 1280,
   height: 720,
   render: {
-    antialias: false,
-    pixelArt: true,
+    antialias: true,
+    antialiasGL: true,
+    pixelArt: false,
   },
   backgroundColor: "#000000",
   input: {
