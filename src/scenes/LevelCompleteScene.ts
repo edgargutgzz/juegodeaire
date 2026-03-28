@@ -9,7 +9,7 @@ const DIALOG: { speaker: "other" | "main"; text: string }[] = [
   { speaker: "other", text: "¡AL FIN LLEGASTE!" },
   { speaker: "main",  text: "FUE UN DÍA DIFÍCIL." },
   { speaker: "other", text: "¿YA VISTE AFUERA?" },
-  { speaker: "other", text: "SE ACLARÓ EL CIELO." },
+  { speaker: "other", text: "SE ACLARÓ EL CIELO DE NUEVO." },
   { speaker: "other", text: "YA SE VEN LAS MONTAÑAS." },
   { speaker: "main",  text: "..." },
 ];
