@@ -169,7 +169,7 @@ export class DataScene extends Phaser.Scene {
             });
           });
 
-          this.time.delayedCall(3000, () => this.advance());
+          this.time.delayedCall(1000, () => this.advance());
         });
       });
     };
