@@ -64,7 +64,7 @@ export class BossScene extends Phaser.Scene {
       ["sfx_explode",    "/assets/sfx/SoundExplosionSmall.wav"],
       ["sfx_goal",       "/assets/sfx/SoundReachGoal.wav"],
       ["sfx_gameover",   "/assets/sfx/SoundGameOver.wav"],
-      ["sfx_death",      "/assets/sfx/SoundDeath.wav"],
+      ["sfx_death",      "/assets/sfx/sfx_death.wav"],
       ["boss_theme",     "/assets/sfx/BossMain.wav"],
     ];
     for (const [key, path] of sfxMap) {
