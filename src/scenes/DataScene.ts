@@ -16,13 +16,11 @@ const LINES: { text: string; gap?: boolean }[] = [
   { text: "POBLACION:  5,341,171 PERSONAS" },
   { text: "AREA:       6,679 KM2" },
   { text: "", gap: true },
-  { text: "", gap: true },
   { text: "RODEADA POR LA SIERRA MADRE, EL AMM ES CONOCIDA COMO" },
   { text: "LA CIUDAD DE LAS MONTAÑAS." },
   { text: "", gap: true },
   { text: "PERO HAY DIAS EN QUE LAS MISMAS DESAPARECEN" },
   { text: "POR COMPLETO." },
-  { text: "", gap: true },
   { text: "", gap: true },
   { text: "EL AIRE AQUI SUPERA 4 VECES LA RECOMENDACION" },
   { text: "SALUDABLE DE PARTICULAS RESPIRABLES PM2.5" },
@@ -163,7 +161,7 @@ export class DataScene extends Phaser.Scene {
           closingGrad.addColorStop(1, "#ff8833");
           closing.setFill(closingGrad);
 
-          this.time.delayedCall(2000, () => {
+          this.time.delayedCall(1000, () => {
             this.cameras.main.fadeIn(600, 0, 0, 0);
             this.tweens.add({
               targets: closing, alpha: 1,
@@ -171,7 +169,7 @@ export class DataScene extends Phaser.Scene {
             });
           });
 
-          this.time.delayedCall(5000, () => this.advance());
+          this.time.delayedCall(3000, () => this.advance());
         });
       });
     };
@@ -188,7 +186,7 @@ export class DataScene extends Phaser.Scene {
   private advance() {
     const alarm = this.sound.get("sfx_alarm");
     if (alarm) {
-      this.tweens.add({ targets: alarm, volume: 0, duration: 800, onComplete: () => {
+      this.tweens.add({ targets: alarm, volume: 0, duration: 300, onComplete: () => {
         alarm.stop();
         this.scene.start("StartScene");
       }});

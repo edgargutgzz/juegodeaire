@@ -19,7 +19,7 @@ const OPTIONS = [
     label: "DIFICIL",
     group: "POBLACION SENSIBLE",
     desc: "• Ninos menores de 12\n• Adultos mayores\n• Mujeres embarazadas\n• Condiciones cardiovasculares\n  o respiratorias",
-    multiplier: 2.0,
+    multiplier: 1.2,
     accentColor: 0xff5533,
     accentHex: "#ff5533",
     bgSelected: 0x1a0e0b,
@@ -151,12 +151,31 @@ export class DifficultyScene extends Phaser.Scene {
         barGfx.strokeRect(barStartX + b * (SW + SGAP), barY, SW, SH);
       }
 
-      if (opt.desc) {
-        this.add.text(cardX, barY + SH + 80, opt.desc, {
-          fontSize: "11px", fontFamily: "'Press Start 2P'",
-          color: "#ffffff", lineSpacing: 14,
-          fixedWidth: cardW, align: "center",
-        }).setOrigin(0, 0);
+      if (opt.key === "dificil") {
+        const tags = ["NINOS MENORES DE 12", "ADULTOS MAYORES", "MUJERES EMBARAZADAS", "COND. CARDIOVASCULAR\nO RESPIRATORIA"];
+        const tagW = cardW * 0.42;
+        const tagH = 48;
+        const tagGapX = cardW * 0.06;
+        const tagGapY = 14;
+        const startY = barY + SH + 90;
+        const col0X = cardX + cardW * 0.04;
+        const col1X = col0X + tagW + tagGapX;
+
+        tags.forEach((label, idx) => {
+          const tx = idx % 2 === 0 ? col0X : col1X;
+          const ty = startY + Math.floor(idx / 2) * (tagH + tagGapY);
+
+          const g = this.add.graphics();
+          g.fillStyle(0xff5533, 0.12);
+          g.fillRect(tx, ty, tagW, tagH);
+          g.lineStyle(1, 0xff5533, 0.8);
+          g.strokeRect(tx, ty, tagW, tagH);
+
+          this.add.text(tx + tagW / 2, ty + tagH / 2, label, {
+            fontSize: "9px", fontFamily: "'Press Start 2P'",
+            color: "#ffffff", align: "center", lineSpacing: 6,
+          }).setOrigin(0.5, 0.5);
+        });
       }
     });
 

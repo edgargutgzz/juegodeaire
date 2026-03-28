@@ -2,7 +2,8 @@ import Phaser from "phaser";
 
 const SIDEWALK_Y  = 660;
 const GROUND_Y    = SIDEWALK_Y - 70; // visual top of grass tile = 610
-const LEVEL_WIDTH   = 9600;
+const LEVEL_WIDTH   = 15800;
+const REFINERY_X    = 13000; // donde paran autos y fábricas
 
 const TRANSITION_X  = 3200; // bosque → ciudad
 const INDUSTRY_X    = 6400; // ciudad → ciudad+autos+industria
@@ -45,6 +46,8 @@ export class GameScene extends Phaser.Scene {
   private newsBannerShown   = false;
   private cutsceneActive    = false;
   private staticCarData:    { img: Phaser.GameObjects.Image; nextFire: number; heights: number[] }[] = [];
+  private factoryData:      { x: number; topY: number; nextFire: number; fireDelay: number; ballCount: number; vyBoost: number }[] = [];
+  private factoriesEnabled  = false;
 
   constructor() { super("GameScene"); }
 
@@ -68,6 +71,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.load.image("bg_talltrees",   "/assets/bg/bg_talltrees.png");
+    this.load.image("bg_mountains",   "/assets/bg/bg_mountains.png");
+    this.load.image("tree02", "/assets/trees/tree02.png");
+    this.load.image("tree10", "/assets/trees/tree10.png");
+    this.load.image("tree11", "/assets/trees/tree11.png");
     this.load.image("bld_beige_front", "/assets/buildings/house_beige_front.png");
     this.load.image("bld_beige_side",  "/assets/buildings/house_beige_side.png");
     this.load.image("bld_grey_front",  "/assets/buildings/house_grey_front.png");
@@ -87,6 +94,11 @@ export class GameScene extends Phaser.Scene {
     this.load.audio("sfx_jump1",  "/assets/sfx/SoundJump1.wav");
     this.load.audio("sfx_jump2",  "/assets/sfx/SoundJump2.wav");
     this.load.audio("sfx_crouch", "/assets/sfx/sfx_dive.wav");
+    this.load.audio("sfx_bomb",        "/assets/sfx/bomb.ogg");
+    this.load.audio("sfx_chimney",     "/assets/sfx/silencer.wav");
+    this.load.audio("sfx_car_exhaust", "/assets/sfx/sfx_car_exhaust.ogg");
+    this.load.audio("sfx_hit_female",  "/assets/sfx/sfx_hit_female.ogg");
+    this.load.audio("sfx_hit_male",    "/assets/sfx/sfx_hit_male.wav");
     this.load.audio("sfx_siren",       "/assets/sfx/siren.mp3");
     this.load.audio("danger_sequence", "/assets/sfx/danger_sequence.ogg");
     this.load.audio("sfx_typewriter",  "/assets/sfx/typewriter.wav");
@@ -94,7 +106,7 @@ export class GameScene extends Phaser.Scene {
     // this.load.audio("sfx_explode",    "/assets/sfx/SoundExplosionSmall.wav");
     // this.load.audio("sfx_goal",       "/assets/sfx/SoundReachGoal.wav");
     // this.load.audio("sfx_gameover",   "/assets/sfx/SoundGameOver.wav");
-    // this.load.audio("sfx_death",      "/assets/sfx/SoundDeath.wav");
+    // this.load.audio("sfx_death", "/assets/sfx/game_over.wav");
   }
 
   create() {
@@ -104,22 +116,32 @@ export class GameScene extends Phaser.Scene {
     this.health               = 10;
     this.jumpsAvailable       = 1;
     this.waveIndex            = 0;
+    this.cutsceneActive       = false;
+    this.newsBannerShown      = false;
+    this.briefingActive       = false;
 
     this.sound.stopAll();
 
     this.difficultyMultiplier = this.registry.get("difficultyMultiplier") ?? 1;
     this.carSpawnerStarted    = false;
     this.staticCarData        = [];
+    this.factoryData          = [];
+    this.factoriesEnabled     = false;
 
     this.physics.world.setBounds(0, -800, LEVEL_WIDTH, 1520);
 
     this.buildWorld();
     this.projectiles = this.physics.add.group();
-    this.goalX = LEVEL_WIDTH - 160;
+    // La refinería ocupa 1280px igual que BossScene
+    const refineryX = LEVEL_WIDTH - 1280;
+    this.drawRefineryBuilding(refineryX, GROUND_Y);
+    // gate left edge = refineryX + FAC_X(140) + FAC_W/2(500) - gateW/2(80) = refineryX + 560
+    const gateLeft = refineryX + 560;
+    this.goalX = gateLeft - 40;
     this.createGoal(this.goalX);
 
     // ── Player ────────────────────────────────────────────────────
-    this.player = this.physics.add.sprite(120, GROUND_Y - 300, "char_idle");
+    this.player = this.physics.add.sprite(200, GROUND_Y - 300, "char_idle");
     this.player.setCollideWorldBounds(true);
     this.player.setScale(0.85);
     this.player.setDepth(5);
@@ -136,6 +158,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.physics.add.collider(this.player, this.platforms);
+
+    // Muro invisible en el portón de la refinería
+    const gateWall = this.physics.add.staticGroup();
+    const wallTile = gateWall.create(this.goalX + 160, GROUND_Y - 100, "sidewalk") as Phaser.Physics.Arcade.Image;
+    wallTile.setVisible(false).setDisplaySize(10, 200).refreshBody();
+    this.physics.add.collider(this.player, gateWall);
     this.physics.add.overlap(this.player, this.projectiles, (_p, proj) => {
       const p = proj as Phaser.Physics.Arcade.Image;
       const damage = p.getData("damage") as number ?? 1;
@@ -148,7 +176,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.15, 0);
     this.cameras.main.scrollY = 0;
     this.cameras.main.fadeOut(0, 0, 0, 0);
-    this.time.delayedCall(1500, () => {
+    this.time.delayedCall(1000, () => {
       this.sound.play("nature_sketch", { loop: true, volume: 0.6 });
       this.cameras.main.fadeIn(600, 0, 0, 0);
     });
@@ -207,20 +235,20 @@ export class GameScene extends Phaser.Scene {
     // Parallax bosque
     this.bgTile.tilePositionX = this.cameras.main.scrollX * 0.2;
     // Cielo se vuelve gris al entrar a la ciudad
-    const cityAlpha = Phaser.Math.Clamp((this.player.x - TRANSITION_X) / 1200, 0, 0.6);
+    const cityAlpha = Phaser.Math.Clamp((this.player.x - (TRANSITION_X + 600)) / 1200, 0, 0.6);
     this.urbanSkyOverlay.setAlpha(cityAlpha);
 
     // Noticiero al entrar a la ciudad
-    if (!this.newsBannerShown && this.player.x >= TRANSITION_X + 1200) {
+    if (!this.newsBannerShown && this.player.x >= TRANSITION_X + 1580) {
       this.newsBannerShown = true;
       this.showNewsBanner();
     }
 
-    // Trigger car spawner when entering industry zone
-    // if (!this.carSpawnerStarted && this.player.x >= INDUSTRY_X) {
-    //   this.carSpawnerStarted = true;
-    //   this.startCarSpawner();
-    // }
+    // Carros aparecen después de la primera fábrica
+    if (!this.carSpawnerStarted && this.player.x >= 9000) {
+      this.carSpawnerStarted = true;
+      this.startCarSpawner();
+    }
 
     const onGround   = this.player.body!.blocked.down;
     if (onGround) {
@@ -283,6 +311,7 @@ export class GameScene extends Phaser.Scene {
       this.jumpsAvailable--;
     }
 
+
     if (this.player.x >= this.goalX) this.onLevelComplete();
 
     // ── Destroy off-screen projectiles ────────────────────────────
@@ -291,8 +320,19 @@ export class GameScene extends Phaser.Scene {
       if (p.x < -100 || p.x > LEVEL_WIDTH + 100 || p.y < -800) p.destroy();
     }
 
-    // ── Static car turrets ────────────────────────────────────────
+    // ── Factory turrets ───────────────────────────────────────────
     const now = this.time.now;
+    if (this.factoriesEnabled) {
+      for (const f of this.factoryData) {
+        const dist = this.player.x - f.x;
+        if (dist > -1200 && dist < 100 && now >= f.nextFire) {
+          f.nextFire = now + f.fireDelay + Math.random() * 600;
+          this.fireFactorySmoke(f.x, f.topY, f.ballCount, f.vyBoost);
+        }
+      }
+    }
+
+    // ── Static car turrets ────────────────────────────────────────
     for (const car of this.staticCarData) {
       if (!car.img.active) continue;
       const dist = this.player.x - car.img.x; // negative = player is left of car
@@ -361,19 +401,41 @@ export class GameScene extends Phaser.Scene {
     this.add.tileSprite(0, SIDEWALK_Y, grassW, 70, "ground_top").setOrigin(0, 1).setDepth(2);
     this.add.tileSprite(TRANSITION_X, SIDEWALK_Y, asphaltW, 70, "asphalt_top").setOrigin(0, 1).setDepth(2);
 
-    // Road markings in industry zone
-    const dashG = this.add.graphics().setDepth(2);
-    dashG.fillStyle(0xddbb00, 0.5);
-    for (let x = INDUSTRY_X; x < LEVEL_WIDTH; x += 80) {
-      dashG.fillRect(x, SIDEWALK_Y + 28, 50, 5);
+
+    // ── Líneas de carretera (zona ciudad) ─────────────────────────
+    const roadG = this.add.graphics().setDepth(2);
+    roadG.fillStyle(0xeebb00, 0.7);
+    for (let x = TRANSITION_X; x < REFINERY_X; x += 120) {
+      roadG.fillRect(x, SIDEWALK_Y + 4, 70, 6); // línea central
     }
 
-    // ── City buildings ────────────────────────────────────────────
-    this.buildCityscape(TRANSITION_X, GROUND_Y);
+    // ── Árboles zona bosque ───────────────────────────────────────
+    // Pinos zona bosque
+    const treeLayout: [string, number, number][] = [
+      ["tree02", 120,  1.8],
+      ["tree11", 480,  1.3],
+      ["tree10", 700,  1.6],
+      ["tree02", 820,  1.2],
+      ["tree11", 1180, 1.7],
+      ["tree10", 1550, 1.4],
+      ["tree02", 1680, 1.9],
+      ["tree11", 2020, 1.3],
+      ["tree10", 2090, 1.6],
+      ["tree02", 2480, 1.5],
+      ["tree11", 2700, 1.8],
+      ["tree10", 2810, 1.2],
+    ];
+    for (const [key, x, scale] of treeLayout) {
+      this.add.image(x, GROUND_Y, key).setOrigin(0.5, 1).setScale(scale).setDepth(1);
+    }
 
-    // ── Zona 3: industria ─────────────────────────────────────────
-    this.buildCityscape(INDUSTRY_X, GROUND_Y);
-    this.buildIndustrialBackground();
+
+    // ── City buildings (tiled across full level) ──────────────────
+    const sectionW = 3200;
+    const refineryStartX = LEVEL_WIDTH - 1280;
+    for (let sx = TRANSITION_X; sx < LEVEL_WIDTH; sx += sectionW) {
+      this.buildCityscape(sx, GROUND_Y, refineryStartX - 900);
+    }
 
     const canvas = document.createElement("canvas");
     canvas.width = 64; canvas.height = 16;
@@ -385,26 +447,30 @@ export class GameScene extends Phaser.Scene {
     }
 
     // this.placeStaticCars();
+    this.placeFactories();
   }
 
 
-  private buildCityscape(startX: number, groundY: number) {
+  private buildCityscape(startX: number, groundY: number, maxX = Infinity) {
     const layout: [string, number, number][] = [
       ["bld_grey_side",   startX + 80,   1.6],
-      ["bld_beige_front", startX + 340,  1.5],
-      ["bld_grey_front",  startX + 560,  1.6],
-      ["bld_beige_side",  startX + 800,  1.5],
-      ["bld_grey_side",   startX + 1060, 1.6],
-      ["bld_beige_front", startX + 1320, 1.5],
-      ["bld_grey_front",  startX + 1540, 1.7],
-      ["bld_beige_side",  startX + 1800, 1.5],
-      ["bld_grey_side",   startX + 2060, 1.6],
-      ["bld_beige_front", startX + 2320, 1.5],
-      ["bld_grey_front",  startX + 2540, 1.6],
-      ["bld_beige_side",  startX + 2780, 1.5],
+      ["bld_beige_front", startX + 320,  1.5],
+      ["bld_grey_front",  startX + 540,  1.6],
+      ["bld_beige_side",  startX + 780,  1.5],
+      ["bld_grey_side",   startX + 1020, 1.6],
+      ["bld_beige_front", startX + 1260, 1.5],
+      ["bld_grey_front",  startX + 1480, 1.7],
+      ["bld_beige_side",  startX + 1720, 1.5],
+      ["bld_grey_side",   startX + 1960, 1.6],
+      ["bld_beige_front", startX + 2200, 1.5],
+      ["bld_grey_front",  startX + 2420, 1.6],
+      ["bld_beige_side",  startX + 2660, 1.5],
+      ["bld_grey_side",   startX + 2900, 1.6],
+      ["bld_beige_front", startX + 3140, 1.5],
     ];
 
     for (const [key, x, scale] of layout) {
+      if (x >= maxX) continue;
       this.add.image(x, groundY, key)
         .setOrigin(0.5, 1)
         .setScale(scale)
@@ -418,11 +484,11 @@ export class GameScene extends Phaser.Scene {
     // Cielo azul base
     this.add.rectangle(W / 2, H / 2, W, H, 0x87ceeb)
       .setScrollFactor(0).setDepth(-3);
-    // Bosque parallax
-    this.bgTile = this.add.tileSprite(0, -100, W, H, "bg_talltrees")
+    // Fondo montañas
+    this.bgTile = this.add.tileSprite(0, -110, W, H, "bg_mountains")
       .setOrigin(0, 0).setScrollFactor(0).setDepth(-2);
     // Overlay cielo urbano (gris) — encima del bosque, se funde al entrar a la ciudad
-    this.urbanSkyOverlay = this.add.rectangle(W / 2, H / 2, W, H, 0x8899a0)
+    this.urbanSkyOverlay = this.add.rectangle(W / 2, H / 2, W, H, 0xc47a2a)
       .setScrollFactor(0).setDepth(-1).setAlpha(0);
   }
 
@@ -590,14 +656,118 @@ export class GameScene extends Phaser.Scene {
 
   // ── Goal ─────────────────────────────────────────────────────────
 
-  private createGoal(x: number) {
-    const goalCenterY = SIDEWALK_Y - 60;
-    const glow = this.add.rectangle(x + 40, goalCenterY, 80, 120, 0x44ff88, 0.35).setDepth(3);
-    this.add.rectangle(x + 40, goalCenterY, 6, 120, 0x22cc66).setDepth(3);
-    this.tweens.add({ targets: glow, alpha: 0.1, duration: 800, yoyo: true, repeat: -1 });
-    this.add.text(x + 40, SIDEWALK_Y - 140, "META", {
-      fontSize: "20px", fontFamily: "'Press Start 2P'", color: "#22cc66",
+  private createGoal(_x: number) {
+    // No visual goal marker — level ends on position trigger
+  }
+
+  private drawRefineryBuilding(ox: number, groundY: number) {
+    // Mismos valores que BossScene
+    const FAC_X = ox + 140;
+    const FAC_W = 1000;
+    const FAC_H = 480;
+    const FAC_Y = groundY - FAC_H;
+    const STACKS = [
+      { rx: 90,  w: 58, h: 300 },
+      { rx: 255, w: 70, h: 360 },
+      { rx: 600, w: 70, h: 330 },
+      { rx: 780, w: 58, h: 280 },
+    ];
+
+    const g = this.add.graphics().setDepth(2);
+
+    // ── Smokestacks ───────────────────────────────────────────────
+    for (const s of STACKS) {
+      const sx = FAC_X + s.rx;
+      const sy = FAC_Y - s.h;
+      g.fillStyle(0x151515, 1);
+      g.fillRect(sx, sy, s.w, s.h + FAC_H * 0.4);
+      g.fillStyle(0xcc2200, 1);
+      g.fillRect(sx, sy + 20, s.w, 14);
+      g.fillRect(sx, sy + s.h * 0.4, s.w, 14);
+      g.fillStyle(0x0d0d0d, 1);
+      g.fillRect(sx - 8, sy - 6, s.w + 16, 18);
+
+      const light = this.add.ellipse(sx + s.w / 2, sy - 14, 18, 18, 0xff2200).setDepth(5);
+      let on = true;
+      this.time.addEvent({
+        delay: 700 + Math.random() * 200, loop: true,
+        callback: () => { on = !on; light.setAlpha(on ? 1 : 0.1); },
+      });
+    }
+
+    // ── Main building ─────────────────────────────────────────────
+    g.fillStyle(0x1c1c1c, 1);
+    g.fillRect(FAC_X, FAC_Y, FAC_W, FAC_H);
+    g.fillStyle(0x242424, 1);
+    g.fillRect(FAC_X, FAC_Y, FAC_W, FAC_H * 0.35);
+    g.fillStyle(0xffffff, 0.04);
+    g.fillRect(FAC_X, FAC_Y, 4, FAC_H);
+
+    // ── Windows ───────────────────────────────────────────────────
+    const winCols = 12, winRows = 6, winW = 44, winH = 30;
+    const winPadX = (FAC_W - winCols * winW) / (winCols + 1);
+    const winStartY = FAC_Y + 40;
+    // Sign bounds — skip windows that overlap it
+    const signX0 = FAC_X + FAC_W / 2 - 160;
+    const signX1 = signX0 + 320;
+    const signY0 = FAC_Y + 18;
+    const signY1 = signY0 + 64;
+
+    for (let row = 0; row < winRows; row++) {
+      for (let col = 0; col < winCols; col++) {
+        const wx = FAC_X + winPadX + col * (winW + winPadX);
+        const wy = winStartY + row * (winH + 28);
+        if (wy + winH > groundY - 60) continue;
+        // Skip windows behind the sign
+        if (wx < signX1 && wx + winW > signX0 && wy < signY1 && wy + winH > signY0) continue;
+        // Skip windows overlapping the gate opening
+        const gateX0 = FAC_X + FAC_W / 2 - 80;
+        const gateX1 = gateX0 + 160;
+        if (wx < gateX1 && wx + winW > gateX0 && wy + winH > groundY - 200) continue;
+        const hash = (col * 7 + row * 13) % 10;
+        if (hash < 6) {
+          g.fillStyle(0xff8800, 0.15);
+          g.fillRect(wx - 4, wy - 4, winW + 8, winH + 8);
+          g.fillStyle(0xffaa44, 0.9);
+          g.fillRect(wx, wy, winW, winH);
+          g.fillStyle(0xffffff, 0.2);
+          g.fillRect(wx, wy, winW, 6);
+        } else {
+          g.fillStyle(0x0a0a0a, 1);
+          g.fillRect(wx, wy, winW, winH);
+        }
+      }
+    }
+
+    // ── Portón de entrada ─────────────────────────────────────────
+    const gateW = 160, gateH = 200;
+    const gateX = FAC_X + FAC_W / 2 - gateW / 2;
+    const gateY = groundY - gateH;
+    g.fillStyle(0x0d0d0d, 1);
+    g.fillRect(gateX, gateY, gateW, gateH);
+    g.fillStyle(0x1c1c1c, 1);
+    g.fillRect(gateX + 10, gateY + 10, gateW - 20, gateH - 10);
+    g.fillStyle(0x333333, 1);
+    for (let bx = gateX + 18; bx < gateX + gateW - 10; bx += 22) {
+      g.fillRect(bx, gateY + 10, 8, gateH - 10);
+    }
+    g.lineStyle(4, 0x444444, 1);
+    g.strokeRect(gateX, gateY, gateW, gateH);
+
+    // ── Letrero SMOG CORP ─────────────────────────────────────────
+    const signW = 320, signH = 64;
+    const signX = FAC_X + FAC_W / 2 - signW / 2;
+    const signY = FAC_Y + 18;
+    g.fillStyle(0x0d0d0d, 1);
+    g.fillRect(signX, signY, signW, signH);
+    g.fillStyle(0xcc2200, 1);
+    g.fillRect(signX + 2, signY + 2, signW - 4, 3);
+    g.fillRect(signX + 2, signY + signH - 5, signW - 4, 3);
+    this.add.text(signX + signW / 2, signY + signH / 2, "CONTAMINANTES\nSA DE CV", {
+      fontSize: "13px", fontFamily: "'Press Start 2P'", color: "#ff4400",
+      align: "center", lineSpacing: 6,
     }).setOrigin(0.5).setDepth(3);
+
   }
 
   // ── Events ────────────────────────────────────────────────────────
@@ -605,10 +775,24 @@ export class GameScene extends Phaser.Scene {
   private onLevelComplete() {
     if (this.levelComplete) return;
     this.levelComplete = true;
+    this.cutsceneActive = true;
+
+    // Monito se queda stuck en la puerta
     this.player.setVelocity(0, 0);
-    this.sfx("sfx_goal", 0.8);
-    this.cameras.main.fadeOut(800, 255, 255, 255);
-    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("BossScene"));
+    this.player.anims.stop();
+    this.player.setTexture("char_idle");
+    this.player.setFlipX(false); // mirando hacia la puerta
+
+    // Corta música del nivel, shake, arranca BossIntro
+    this.sound.stopAll();
+    this.cameras.main.shake(250, 0.008);
+    this.sound.play("sfx_boss_enter", { volume: 0.9 });
+
+    // Fade a negro rápido — BossIntro sigue sonando en BossScene
+    this.time.delayedCall(600, () => {
+      this.cameras.main.fadeOut(800, 0, 0, 0);
+      this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("BossScene"));
+    });
   }
 
   private onHit(damage = 1) {
@@ -617,7 +801,25 @@ export class GameScene extends Phaser.Scene {
     this.health = Math.max(0, this.health - damage * this.difficultyMultiplier);
     this.drawHealthBar();
     this.sfx("sfx_hit", 0.7);
+    const character = this.registry.get("character") as string ?? "";
+    const isFemale  = character.toLowerCase().includes("female");
+    const hitKey = isFemale ? "sfx_hit_female" : "sfx_hit_male";
+    if (this.cache.audio.exists(hitKey)) {
+      const hitSfx = this.sound.add(hitKey, { volume: 0.8 });
+      hitSfx.play({ seek: isFemale ? 0.3 : 0 });
+      const cutoff = isFemale ? 1000 : 800;
+      this.time.delayedCall(cutoff, () => { if (hitSfx.isPlaying) hitSfx.stop(); hitSfx.destroy(); });
+    }
     this.player.setTint(0xff4444);
+    this.tweens.add({
+      targets: this.player, x: this.player.x - 6,
+      duration: 50, yoyo: true, repeat: 3, ease: "Sine.easeInOut",
+    });
+    this.tweens.add({
+      targets: this.player, alpha: 0.2,
+      duration: 80, yoyo: true, repeat: 1, ease: "Stepped",
+      onComplete: () => this.player.setAlpha(1),
+    });
     this.cameras.main.shake(220, 0.007);
 
     // Red vignette flash
@@ -631,10 +833,9 @@ export class GameScene extends Phaser.Scene {
     if (this.health <= 0) {
       this.levelComplete = true;
       this.sfx("sfx_death", 0.8);
-      this.time.delayedCall(600, () => this.sfx("sfx_gameover", 0.8));
       this.cameras.main.fadeOut(800, 0, 0, 0);
       this.cameras.main.once("camerafadeoutcomplete", () => {
-        this.scene.start("GameOverScene");
+        this.scene.start("StartScene");
       });
       return;
     }
@@ -807,13 +1008,13 @@ export class GameScene extends Phaser.Scene {
     // Portrait del otro personaje
     const portraitSize = boxH * 0.75;
     const portraitX = boxX + portraitSize * 0.56;
-    const portrait = this.add.image(portraitX, boxY, "other_idle")
+    const portrait = this.add.image(portraitX, boxY - 20, "other_idle")
       .setScrollFactor(0).setDepth(33).setScale(portraitSize / 128);
 
     // Línea separadora
     const sepX = portraitX + portraitSize * 0.56;
     const lineG = this.add.graphics().setScrollFactor(0).setDepth(32);
-    lineG.lineStyle(1, accent, 0.4);
+    lineG.lineStyle(1, 0xff5533, 0.4);
     lineG.lineBetween(sepX, boxY - boxH / 2 + 10, sepX, boxY + boxH / 2 - 10);
 
 
@@ -823,12 +1024,11 @@ export class GameScene extends Phaser.Scene {
       "",
       "EL AIRE ESTA MUY CONTAMINADO HOY.",
       "",
-      "LLEGA A CASA CUANTO ANTES,",
-      "AQUI TE ESPERO.",
+      "LLEGA A CASA CUANTO ANTES, AQUI TE ESPERO.",
       "",
       "¡TEN CUIDADO!",
     ];
-    const textObj = this.add.text(sepX + W * 0.03, boxY - boxH / 2 + 18, "", {
+    const textObj = this.add.text(sepX + W * 0.03, boxY - 65, "", {
       fontSize: "13px", fontFamily: "'Press Start 2P'",
       color: "#cccccc", wordWrap: { width: boxX + boxW - sepX - W * 0.06 }, lineSpacing: 6,
     }).setOrigin(0, 0).setScrollFactor(0).setDepth(33);
@@ -845,12 +1045,14 @@ export class GameScene extends Phaser.Scene {
       if (i >= fullText.length) {
         typeSound.stop();
         const dismiss = () => {
+          this.sfx("sfx_select", 1.0);
           this.tweens.add({
             targets: [dimmer, boxBg, boxBorder, portrait, lineG, textObj],
             alpha: 0, duration: 500,
             onComplete: () => {
               [dimmer, boxBg, boxBorder, accentBar, portrait, lineG, textObj].forEach(o => o.destroy());
-              this.cutsceneActive = false;
+              this.cutsceneActive   = false;
+              this.factoriesEnabled = true;
             },
           });
         };
@@ -872,7 +1074,7 @@ export class GameScene extends Phaser.Scene {
   private showNewsBanner() {
     const W = this.scale.width;
     const H = this.scale.height;
-    const bannerY = H - 100;
+    const bannerY = H - 120;
 
     // Congelar player
     this.cutsceneActive = true;
@@ -902,23 +1104,39 @@ export class GameScene extends Phaser.Scene {
     if (music) this.tweens.add({ targets: music, volume: 0, duration: 800, onComplete: () => music.stop() });
     this.sfx("sfx_siren", 0.5);
 
-    // Fondo rojo "BREAKING NEWS"
-    const redBar = this.add.rectangle(0, bannerY - 18, W, 28, 0xcc0000, 1)
-      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(30).setAlpha(0);
-    const breakingLabel = this.add.text(16, bannerY - 18, "⚠ ALERTA POR CONTINGENCIA AMBIENTAL", {
-      fontSize: "13px", fontFamily: "'Press Start 2P'", color: "#ffffff",
-    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31).setAlpha(0);
+    // ── Banner box (estilo dialog del juego) ─────────────────────
+    const accent    = 0xff5533;
+    const accentHex = "#ff5533";
+    const boxH  = 120;
+    const boxX  = 0;
+    const boxW  = W;
+    const boxY  = H - boxH / 2;
 
-    // Ticker negro con el mensaje
-    const tickerBg = this.add.rectangle(0, bannerY + 14, W, 28, 0x111111, 0.92)
-      .setOrigin(0, 0.5).setScrollFactor(0).setDepth(30).setAlpha(0);
-    const tickerText = this.add.text(W, bannerY + 14,
-      "SE RECOMIENDA NO REALIZAR ACTIVIDADES AL AIRE LIBRE  •  PERMANEZCA EN INTERIORES", {
-      fontSize: "11px", fontFamily: "'Press Start 2P'", color: "#ffff00",
-    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(31).setAlpha(0);
+    const boxBg = this.add.rectangle(boxX + boxW / 2, boxY, boxW, boxH, 0x0a0a0a, 0.96)
+      .setScrollFactor(0).setDepth(30).setAlpha(0);
+    const boxBorder = this.add.graphics().setScrollFactor(0).setDepth(31).setAlpha(0);
+    boxBorder.lineStyle(2, accent, 1);
+    boxBorder.lineBetween(boxX, boxY - boxH / 2, boxX + boxW, boxY - boxH / 2);
+    const accentBar = this.add.rectangle(boxX + boxW / 2, boxY - boxH / 2, boxW, 3, accent, 1)
+      .setScrollFactor(0).setDepth(31).setAlpha(0);
+
+    const titleLabel = this.add.text(boxX + 16, boxY - boxH / 2 + 24, "ALERTA POR CONTINGENCIA AMBIENTAL", {
+      fontSize: "13px", fontFamily: "'Press Start 2P'", color: accentHex,
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(32).setAlpha(0);
+
+    // Separator line under title
+    const sepLine = this.add.graphics().setScrollFactor(0).setDepth(31).setAlpha(0);
+    sepLine.lineStyle(1, accent, 0.35);
+    sepLine.lineBetween(boxX + 8, boxY - boxH / 2 + 44, boxX + boxW - 8, boxY - boxH / 2 + 44);
+
+    // Scrolling ticker text — starts at right edge of box
+    const tickerText = this.add.text(boxX + boxW, boxY + 20,
+      "SE RECOMIENDA NO REALIZAR ACTIVIDADES AL AIRE LIBRE   •   PERMANEZCA EN INTERIORES", {
+      fontSize: "13px", fontFamily: "'Press Start 2P'", color: "#ffffff",
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(32).setAlpha(0);
 
     // Fade in
-    this.tweens.add({ targets: [redBar, breakingLabel, tickerBg, tickerText], alpha: 1, duration: 300 });
+    this.tweens.add({ targets: [boxBg, boxBorder, accentBar, titleLabel, sepLine, tickerText], alpha: 1, duration: 300 });
 
     // Ticker scrolling
     this.tweens.add({
@@ -931,9 +1149,9 @@ export class GameScene extends Phaser.Scene {
     // Fade out banner, sirena y liberar player
     this.time.delayedCall(9000, () => {
       this.tweens.add({
-        targets: [redBar, breakingLabel, tickerBg, tickerText],
+        targets: [boxBg, boxBorder, accentBar, titleLabel, sepLine, tickerText],
         alpha: 0, duration: 600,
-        onComplete: () => [redBar, breakingLabel, tickerBg, tickerText].forEach(o => o.destroy()),
+        onComplete: () => [boxBg, boxBorder, accentBar, titleLabel, sepLine, tickerText].forEach(o => o.destroy()),
       });
       const siren = this.sound.get("sfx_siren");
       if (siren) this.tweens.add({ targets: siren, volume: 0, duration: 800, onComplete: () => siren.stop() });
@@ -1037,6 +1255,7 @@ export class GameScene extends Phaser.Scene {
       this.healthBar.fillRect(barX + i * segW - 1, barY, 2, barH);
     }
 
+
     // ── Blink on critical ─────────────────────────────────────────
     if (this.health <= 2 && !this.criticalTween) {
       this.criticalTween = this.tweens.add({
@@ -1053,51 +1272,32 @@ export class GameScene extends Phaser.Scene {
   // ── Zona 3: industria ─────────────────────────────────────────────
 
   private buildIndustrialBackground() {
-    const g = this.add.graphics().setDepth(0);
-    const stacks: [number, number, number][] = [ // [x, height, width]
-      [INDUSTRY_X + 200,  220, 40], [INDUSTRY_X + 240,  180, 28],
-      [INDUSTRY_X + 700,  260, 50], [INDUSTRY_X + 750,  200, 35],
-      [INDUSTRY_X + 1200, 280, 55], [INDUSTRY_X + 1260, 210, 38],
-      [INDUSTRY_X + 1700, 250, 48], [INDUSTRY_X + 1760, 200, 32],
-      [INDUSTRY_X + 2200, 270, 52], [INDUSTRY_X + 2260, 220, 36],
-      [INDUSTRY_X + 2700, 260, 46], [INDUSTRY_X + 2750, 195, 30],
-    ];
-
-    for (const [x, h, w] of stacks) {
-      // Stack body
-      g.fillStyle(0x555566, 1);
-      g.fillRect(x, GROUND_Y - h, w, h);
-      // Darker stripe
-      g.fillStyle(0x444455, 1);
-      g.fillRect(x + w * 0.6, GROUND_Y - h, w * 0.4, h);
-      // Top rim
-      g.fillStyle(0x777788, 1);
-      g.fillRect(x - 4, GROUND_Y - h - 10, w + 8, 12);
-    }
+    // chimneys removed
   }
 
   private startCarSpawner() {
     const CAR_KEYS = [
-      { key: "veh_sedan",         scale: 3.5, speed: 280 },
-      { key: "veh_sedan_blue",    scale: 3.5, speed: 260 },
-      { key: "veh_suv",           scale: 3.5, speed: 240 },
-      { key: "veh_van",           scale: 3.5, speed: 220 },
-      { key: "veh_truck",         scale: 4,   speed: 180 },
-      { key: "veh_truck_trailer", scale: 4,   speed: 160 },
-      { key: "veh_bus",           scale: 4,   speed: 170 },
-      { key: "veh_truckdark",     scale: 4,   speed: 190 },
+      { key: "veh_sedan",         scale: 5.5, speed: 280 },
+      { key: "veh_sedan_blue",    scale: 5.5, speed: 260 },
+      { key: "veh_suv",           scale: 5.5, speed: 240 },
+      { key: "veh_van",           scale: 5.8, speed: 220 },
+      { key: "veh_truck",         scale: 6.0, speed: 180 },
+      { key: "veh_bus",           scale: 6.0, speed: 170 },
+      { key: "veh_truckdark",     scale: 6.0, speed: 190 },
     ];
 
     const spawnCar = () => {
-      if (this.levelComplete) return;
+      if (this.levelComplete || this.player.x >= REFINERY_X) return;
       const def = CAR_KEYS[Math.floor(Math.random() * CAR_KEYS.length)];
       // Spawn slightly off right edge of camera
       const spawnX = this.cameras.main.scrollX + this.scale.width + 100;
-      // Two road lanes
-      const lane = Math.random() < 0.5 ? SIDEWALK_Y - 38 : SIDEWALK_Y - 20;
+      // Dos carriles fijos: superior e inferior
+      const LANE_TOP    = SIDEWALK_Y - 55; // carril de atrás
+      const LANE_BOTTOM = SIDEWALK_Y - 18; // carril de enfrente
+      const lane = Math.random() < 0.5 ? LANE_TOP : LANE_BOTTOM;
       const car = this.add.image(spawnX, lane, def.key)
         .setScale(def.scale)
-        .setDepth(3)
+        .setDepth(6) // delante del player (depth 5)
         .setFlipX(true); // facing left
 
       // Drive left
@@ -1109,25 +1309,31 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => car.destroy(),
       });
 
-      // Exhaust puff every ~1.5s while car is alive
+      // Exhaust burst every ~2s — 3 puffs en columna ascendente
       const exhaustTimer = this.time.addEvent({
-        delay: 1200 + Math.random() * 600,
+        delay: 1800 + Math.random() * 800,
         loop: true,
         callback: () => {
           if (!car.active || this.levelComplete) { exhaustTimer.remove(); return; }
-          this.spawnCarExhaust(car.x + (def.key.includes("truck") ? 60 : 30), car.y - 5);
+          const exhaustX = car.x + (def.key.includes("truck") ? 65 : 35);
+          // this.sfx("sfx_car_exhaust", 0.4);
+          for (let i = 0; i < 3; i++) {
+            this.time.delayedCall(i * 120, () => {
+              if (!car.active || this.levelComplete) return;
+              this.spawnCarExhaust(exhaustX + (Math.random() * 10 - 5), car.y - 8);
+            });
+          }
         },
       });
 
-      // Next car
-      const nextDelay = 1800 + Math.random() * 2500;
+      // Next car — más frecuente conforme avanza el jugador
+      const progress   = Phaser.Math.Clamp((this.player.x - 9000) / 4000, 0, 1);
+      const nextDelay  = Phaser.Math.Linear(8000, 2000, progress) + Math.random() * 1000;
       this.time.delayedCall(nextDelay, spawnCar);
     };
 
-    // Start with a small delay and spawn 2-3 cars right away staggered
-    this.time.delayedCall(800,  spawnCar);
-    this.time.delayedCall(2200, spawnCar);
-    this.time.delayedCall(3800, spawnCar);
+    // Arranca con 1 solo carro, los siguientes se encadenan solos con delay creciente
+    this.time.delayedCall(1200, spawnCar);
   }
 
   private placeStaticCars() {
@@ -1222,28 +1428,178 @@ export class GameScene extends Phaser.Scene {
     proj.on("destroy", () => { if (this.textures.exists(key)) this.textures.remove(key); });
   }
 
+  // ── Factories ─────────────────────────────────────────────────────
+
+  private placeFactories() {
+    // Progresión: 1 fábrica sola → carros se unen → más fábricas → más difícil
+    // [x,     fireDelay, ballCount, vyBoost, scale]
+    const factories: [number, number, number, number, number][] = [
+      [6200,  5000, 4,  -0.3, 1.4], // 1ª — pequeña, introduce mechanic
+      [7800,  3500, 4,   0.2, 1.3], // 2ª — normal
+      [8200,  2000, 4,  -0.5, 1.6], // 3ª — grande
+      [10500, 1600, 4,   0.0, 1.5], // 4ª — mediana
+      [12000, 1200, 6,  -0.4, 1.8], // 5ª — muy grande, última
+    ];
+    for (let i = 0; i < factories.length; i++) {
+      const [x, fireDelay, ballCount, vyBoost, scale] = factories[i];
+      const stackTopY = this.drawFactory(x, GROUND_Y, "", scale);
+      this.factoryData.push({
+        x:         x + 30 * scale,
+        topY:      stackTopY,
+        nextFire:  this.time.now + 1500 + i * 800,
+        fireDelay,
+        ballCount,
+        vyBoost,
+      });
+    }
+  }
+
+
+  private drawFactory(x: number, groundY: number, _name: string, scale = 1.0): number {
+    const g = this.add.graphics().setDepth(1);
+
+    // ── Main building body ────────────────────────────────────────
+    const bW = 220 * scale, bH = 170 * scale;
+    const bX = x - bW / 2;
+    const bY = groundY - bH;
+
+    // Shadow
+    g.fillStyle(0x000000, 0.12);
+    g.fillRect(bX + 6, bY + 6, bW, bH);
+
+    // Body
+    g.fillStyle(0x4a5060, 1);
+    g.fillRect(bX, bY, bW, bH);
+
+    // Side panel darker
+    g.fillStyle(0x383d4a, 1);
+    g.fillRect(bX + bW * 0.65, bY, bW * 0.35, bH);
+
+    // Roof trim
+    g.fillStyle(0x5a6070, 1);
+    g.fillRect(bX - 4, bY, bW + 8, 10 * scale);
+
+    // Windows (orange glow — furnace light)
+    const wW = 28 * scale, wH = 20 * scale;
+    g.fillStyle(0xff9933, 0.9);
+    g.fillRect(bX + 20 * scale, bY + 30 * scale, wW, wH);
+    g.fillRect(bX + 62 * scale, bY + 30 * scale, wW, wH);
+    g.fillRect(bX + 104 * scale, bY + 30 * scale, wW, wH);
+    // Window frames
+    g.fillStyle(0x2a2f38, 1);
+    g.fillRect(bX + 20 * scale,  bY + 30 * scale, 2, wH);
+    g.fillRect(bX + 62 * scale,  bY + 30 * scale, 2, wH);
+    g.fillRect(bX + 104 * scale, bY + 30 * scale, 2, wH);
+
+    // Door
+    g.fillStyle(0x2a2f38, 1);
+    g.fillRect(bX + bW / 2 - 16 * scale, groundY - 50 * scale, 32 * scale, 50 * scale);
+
+    // ── Smokestack ────────────────────────────────────────────────
+    const sX    = x + 30 * scale;
+    const sW    = 22 * scale;
+    const sH    = 90 * scale;
+    const sTopY = bY - sH;
+
+    // Stack body
+    g.fillStyle(0x333340, 1);
+    g.fillRect(sX - sW / 2, sTopY, sW, sH);
+    // Dark stripe
+    g.fillStyle(0x222230, 1);
+    g.fillRect(sX - sW / 2 + sW * 0.6, sTopY, sW * 0.4, sH);
+    // Rim
+    g.fillStyle(0x555566, 1);
+    g.fillRect(sX - sW / 2 - 4, sTopY - 8, sW + 8, 10);
+
+    return sTopY - 8; // tope de la chimenea
+  }
+
+  private fireFactorySmoke(factoryX: number, stackTopY: number, ballCount: number, vyBoost: number) {
+    this.sfx("sfx_chimney", 0.5);
+    const half   = Math.floor(ballCount / 2);
+    const spread = 50;
+    const angles: number[] = [];
+    for (let i = 0; i < half; i++) {
+      const t = half > 1 ? i / (half - 1) : 0.5;
+      angles.push(-150 + t * spread); // izquierda
+    }
+    for (let i = 0; i < half; i++) {
+      const t = half > 1 ? i / (half - 1) : 0.5;
+      angles.push(-80 + t * spread);  // derecha
+    }
+    const spd = (160 + Math.random() * 40) * this.projSpeedMult;
+    for (const deg of angles) {
+      const rad = Phaser.Math.DegToRad(deg);
+      const vx  = Math.cos(rad) * spd;
+      const vy  = Math.sin(rad) * spd * (1 + vyBoost); // vyBoost ajusta altura del arco
+      this.spawnSmokeBall(factoryX, stackTopY, vx, vy);
+    }
+  }
+
+  private spawnSmokeBall(spawnX: number, spawnY: number, vx?: number, vy?: number) {
+    const isPM25 = Math.random() < 0.5;
+    const radius = isPM25 ? 9 : 17;
+    const color  = isPM25 ? 0x888899 : 0xaaaaaa;
+    const damage = isPM25 ? 2 : 1;
+
+    const key = `smoke_${Date.now()}_${Math.random()}`;
+    const gfx = this.make.graphics({ x: 0, y: 0 } as any);
+    gfx.fillStyle(Phaser.Display.Color.ValueToColor(color).darken(30).color, 1);
+    gfx.fillCircle(radius, radius, radius);
+    gfx.fillStyle(color, 0.9);
+    gfx.fillCircle(radius, radius, radius * 0.7);
+    gfx.fillStyle(0xffffff, 0.22);
+    gfx.fillCircle(radius * 0.55, radius * 0.45, radius * 0.3);
+    gfx.generateTexture(key, radius * 2, radius * 2);
+    gfx.destroy();
+
+    const proj = this.projectiles.create(spawnX, spawnY, key) as Phaser.Physics.Arcade.Image;
+    proj.setDepth(4);
+    proj.setData("damage", damage);
+    // Gravedad activada — la bola sale horizontal y cae en arco
+    (proj.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
+
+    const finalVx = vx ?? -(140 + Math.random() * 50) * this.projSpeedMult;
+    const finalVy = vy ?? -(30 + Math.random() * 30);
+    proj.setVelocity(finalVx, finalVy);
+    this.tweens.add({ targets: proj, angle: 360, duration: 2200 + Math.random() * 1000, repeat: -1 });
+    proj.on("destroy", () => { if (this.textures.exists(key)) this.textures.remove(key); });
+  }
+
   private spawnCarExhaust(x: number, y: number) {
     const isPM25 = Math.random() < 0.5;
-    const radius = isPM25 ? 5 : 12;
-    const color  = 0x888888;
-    const damage = isPM25 ? 3 : 1;
+    const radius = isPM25 ? 8 : 14;
+    const color  = isPM25 ? 0x777788 : 0x999999;
+    const damage = isPM25 ? 2 : 1;
 
     const key = `exhaust_${Date.now()}_${Math.random()}`;
     const gfx = this.make.graphics({ x: 0, y: 0 } as any);
-    gfx.fillStyle(0x555555, 0.8);
+    gfx.fillStyle(0x444455, 0.9);
     gfx.fillCircle(radius, radius, radius);
-    gfx.fillStyle(color, 0.6);
+    gfx.fillStyle(color, 0.75);
     gfx.fillCircle(radius, radius, radius * 0.7);
+    gfx.fillStyle(0xffffff, 0.15);
+    gfx.fillCircle(radius * 0.5, radius * 0.4, radius * 0.3);
     gfx.generateTexture(key, radius * 2, radius * 2);
     gfx.destroy();
 
     const proj = this.projectiles.create(x, y, key) as Phaser.Physics.Arcade.Image;
-    proj.setDepth(4).setAlpha(0.85);
+    proj.setDepth(4).setAlpha(0.9);
     proj.setData("damage", damage);
     (proj.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
-    // Drift left and upward (exhaust from moving car)
-    proj.setVelocity(-(60 + Math.random() * 40), -(30 + Math.random() * 30));
-    this.tweens.add({ targets: proj, alpha: 0, duration: 3000, ease: "Quad.Out", onComplete: () => proj.destroy() });
+
+    // Sube en columna: fuerte impulso vertical, pequeña deriva lateral aleatoria
+    const vx = (Math.random() * 30 - 15);
+    const vy = -(220 + Math.random() * 100);
+    proj.setVelocity(vx, vy);
+
+    // Fade out alto en el cielo
+    this.tweens.add({
+      targets: proj, alpha: 0,
+      duration: 3200, ease: "Quad.In",
+      onComplete: () => proj.destroy(),
+    });
+    this.tweens.add({ targets: proj, angle: 180, duration: 1200, repeat: -1 });
     proj.on("destroy", () => { if (this.textures.exists(key)) this.textures.remove(key); });
   }
 }

@@ -2,7 +2,8 @@ import Phaser from "phaser";
 
 const W       = 1280;
 const H       = 720;
-const FLOOR_Y = 628;
+const FLOOR_Y    = 590;  // igual que GROUND_Y en GameScene
+const SIDEWALK_Y = 660;  // igual que GameScene, para los tiles de asfalto
 
 // Factory geometry
 const FAC_X = 140;
@@ -49,29 +50,34 @@ export class BossScene extends Phaser.Scene {
   private smokeParticles: SmokeParticle[] = [];
   private startTime = -1;
 
-  private powerups!:     Phaser.Physics.Arcade.StaticGroup;
-  private maskInvincible = false;
-  private maskEndTime    = 0;
   private blinkTween:    Phaser.Tweens.Tween | null = null;
-  private maskBarGfx!:   Phaser.GameObjects.Graphics;
-  private maskIcon!:     Phaser.GameObjects.Graphics;
+  private criticalTween: Phaser.Tweens.Tween | null = null;
 
   constructor() { super("BossScene"); }
 
   preload() {
     const sfxMap: [string, string][] = [
-      ["sfx_powerup",    "/assets/sfx/SoundBonus.wav"],
       ["sfx_jump",       "/assets/sfx/SoundJump1.wav"],
       ["sfx_land",       "/assets/sfx/SoundLand1.wav"],
       ["sfx_hit",        "/assets/sfx/SoundPlayerHit.wav"],
+      ["sfx_hit_female", "/assets/sfx/sfx_hit_female.ogg"],
+      ["sfx_hit_male",   "/assets/sfx/sfx_hit_male.wav"],
       ["sfx_explode",    "/assets/sfx/SoundExplosionSmall.wav"],
       ["sfx_goal",       "/assets/sfx/SoundReachGoal.wav"],
       ["sfx_gameover",   "/assets/sfx/SoundGameOver.wav"],
       ["sfx_death",      "/assets/sfx/SoundDeath.wav"],
+      ["boss_theme",     "/assets/sfx/BossMain.wav"],
     ];
     for (const [key, path] of sfxMap) {
       if (!this.cache.audio.exists(key)) this.load.audio(key, path);
     }
+    this.load.image("firstaid", "/assets/items/firstaid.png");
+    if (!this.textures.exists("bg_mountains"))
+      this.load.image("bg_mountains", "/assets/bg/bg_mountains.png");
+    if (!this.textures.exists("asphalt_top"))
+      this.load.image("asphalt_top",  "/assets/ground/asphalt_top.png");
+    if (!this.textures.exists("asphalt_fill"))
+      this.load.image("asphalt_fill", "/assets/ground/asphalt_fill.png");
     if (!this.textures.exists("ptcl_spark1")) {
       this.load.image("ptcl_spark1", "/assets/particles/spark_01.png");
       this.load.image("ptcl_spark2", "/assets/particles/spark_02.png");
@@ -102,9 +108,8 @@ export class BossScene extends Phaser.Scene {
     this.startTime       = -1; // set on first update tick
     this.smokeParticles  = [];
     this.warningLights   = [];
-    this.maskInvincible  = false;
-    this.maskEndTime     = 0;
     this.blinkTween      = null;
+    this.criticalTween   = null;
 
     this.physics.world.gravity.y = 600;
     this.physics.world.setBounds(0, -400, W, H + 400);
@@ -132,8 +137,6 @@ export class BossScene extends Phaser.Scene {
     this.projectiles = this.physics.add.group();
     this.physics.add.overlap(this.player, this.projectiles, (_p, proj) => {
       const p = proj as Phaser.Physics.Arcade.Image;
-      this.spawnParticles(p.x, p.y);
-      this.sfx("sfx_explode", 0.5);
       p.destroy();
       this.onHit();
     });
@@ -142,13 +145,6 @@ export class BossScene extends Phaser.Scene {
     this.cursors  = this.input.keyboard!.createCursorKeys();
     this.input.gamepad!.once("connected", (pad: Phaser.Input.Gamepad.Gamepad) => { this.pad = pad; });
     if (this.input.gamepad!.total > 0) this.pad = this.input.gamepad!.getPad(0);
-
-    // ── Mask HUD ──────────────────────────────────────────────────
-    this.maskIcon   = this.add.graphics().setScrollFactor(0).setDepth(23);
-    this.maskBarGfx = this.add.graphics().setScrollFactor(0).setDepth(23);
-
-    // ── Power-ups ─────────────────────────────────────────────────
-    this.setupPowerups();
 
     // ── Smoke (slow at first, intensifies on landing) ─────────────
     this.startSmoke();
@@ -204,27 +200,6 @@ export class BossScene extends Phaser.Scene {
       });
     });
 
-    // "FÁBRICA DE SMOG" slams in with zoom
-    this.time.delayedCall(2200, () => {
-      const title = this.add.text(W / 2, H / 2 - 20, "FÁBRICA\nDE SMOG", {
-        fontSize: "60px", fontFamily: "'Press Start 2P'",
-        color: "#ff2200", stroke: "#000000", strokeThickness: 12,
-        align: "center", lineSpacing: 10,
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setScale(2.5).setAlpha(0);
-
-      this.tweens.add({
-        targets: title,
-        alpha: 1, scaleX: 1, scaleY: 1,
-        duration: 180, ease: "Back.Out",
-      });
-      this.cameras.main.shake(250, 0.018);
-
-      this.tweens.add({
-        targets: title, alpha: 0,
-        duration: 350, delay: 1400,
-        onComplete: () => title.destroy(),
-      });
-    });
 
     // Wait for player to land, then do landing effects + start game
     const checkLanding = this.time.addEvent({
@@ -280,7 +255,8 @@ export class BossScene extends Phaser.Scene {
 
     // Music kicks in on landing
     this.time.delayedCall(200, () => {
-      // this.sound.play("bossbattle", { loop: true, volume: 0.7 });
+      this.sound.stopAll();
+      this.sound.play("boss_theme", { loop: true, volume: 0.7 });
     });
 
     // Release player control and start waves after 1.2s
@@ -301,13 +277,6 @@ export class BossScene extends Phaser.Scene {
       this.jumpsAvailable = 1;
     }
     this.wasOnGround = onGround;
-
-    // ── Mask timer ────────────────────────────────────────────────
-    if (this.maskInvincible) {
-      const remaining = this.maskEndTime - this.time.now;
-      if (remaining <= 0) this.deactivateMask();
-      else this.drawMaskBar(remaining / 6000);
-    }
 
     // ── Boss bar (time-based depletion) ───────────────────────────
     const elapsed    = this.time.now - this.startTime;
@@ -403,19 +372,16 @@ export class BossScene extends Phaser.Scene {
   // ── Background & factory ─────────────────────────────────────────
 
   private drawBackground() {
-    // Smoggy gradient sky
-    const sky = this.add.graphics().setDepth(-5);
-    sky.fillGradientStyle(0x1a0a00, 0x1a0a00, 0x3d1a00, 0x3d1a00, 1);
-    sky.fillRect(0, 0, W, FLOOR_Y);
-    // Ground
-    this.add.rectangle(W / 2, FLOOR_Y + (H - FLOOR_Y) / 2, W, H - FLOOR_Y, 0x111111).setDepth(-4);
-
-    // Distant haze layers
-    const haze = this.add.graphics().setDepth(-4);
-    haze.fillStyle(0x331500, 0.3);
-    haze.fillRect(0, FLOOR_Y - 120, W, 120);
-    haze.fillStyle(0x662200, 0.12);
-    haze.fillRect(0, FLOOR_Y - 280, W, 200);
+    // Mismo bg que GameScene (ciudad)
+    this.add.rectangle(W / 2, H / 2, W, H, 0x87ceeb).setScrollFactor(0).setDepth(-3);
+    this.add.tileSprite(0, -110, W, H, "bg_mountains")
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(-2);
+    this.add.rectangle(W / 2, FLOOR_Y / 2, W, FLOOR_Y, 0xc47a2a)
+      .setScrollFactor(0).setDepth(-1).setAlpha(0.6);
+    // Ground — mismo asfalto que GameScene
+    this.add.rectangle(W / 2, SIDEWALK_Y + (H - SIDEWALK_Y) / 2, W, H - SIDEWALK_Y, 0x8a9fa0).setDepth(-4);
+    this.add.tileSprite(0, SIDEWALK_Y - 2, W, H - SIDEWALK_Y + 2, "asphalt_fill").setOrigin(0, 0).setDepth(-3);
+    this.add.tileSprite(0, SIDEWALK_Y, W, 70, "asphalt_top").setOrigin(0, 1).setDepth(-2);
   }
 
   private drawFactory() {
@@ -441,9 +407,6 @@ export class BossScene extends Phaser.Scene {
     }
 
     // ── Main factory building ─────────────────────────────────────
-    // Shadow
-    g.fillStyle(0x000000, 0.5);
-    g.fillRect(FAC_X + 8, FAC_Y + 8, FAC_W, FAC_H);
     // Body
     g.fillStyle(0x1c1c1c, 1);
     g.fillRect(FAC_X, FAC_Y, FAC_W, FAC_H);
@@ -463,17 +426,29 @@ export class BossScene extends Phaser.Scene {
     const winPadY = 28;
     const winStartY = FAC_Y + 40;
 
+    // Sign bounds — skip windows that overlap it
+    const signX0 = FAC_X + FAC_W / 2 - 160;
+    const signX1 = signX0 + 320;
+    const signY0 = FAC_Y + 18;
+    const signY1 = signY0 + 64;
+
     for (let row = 0; row < winRows; row++) {
       for (let col = 0; col < winCols; col++) {
         const wx = FAC_X + winPadX + col * (winW + winPadX);
         const wy = winStartY + row * (winH + winPadY);
         if (wy + winH > FLOOR_Y - 60) continue; // skip bottom row near gate
+        // Skip windows behind the sign
+        if (wx < signX1 && wx + winW > signX0 && wy < signY1 && wy + winH > signY0) continue;
+        // Skip windows overlapping the gate opening
+        const gateX0 = FAC_X + FAC_W / 2 - 80;
+        const gateX1 = gateX0 + 160;
+        if (wx < gateX1 && wx + winW > gateX0 && wy + winH > FLOOR_Y - 200) continue;
         const hash = (col * 7 + row * 13) % 10;
         if (hash < 6) {
           // Lit window
           g.fillStyle(0xff8800, 0.15);
           g.fillRect(wx - 4, wy - 4, winW + 8, winH + 8);
-          g.fillStyle(hash < 3 ? 0xffaa44 : 0xff7700, 0.9);
+          g.fillStyle(0xffaa44, 0.9);
           g.fillRect(wx, wy, winW, winH);
           g.fillStyle(0xffffff, 0.2);
           g.fillRect(wx, wy, winW, 6);
@@ -508,7 +483,7 @@ export class BossScene extends Phaser.Scene {
 
     // ── "SMOG CORP" sign ─────────────────────────────────────────
     const signW = 320;
-    const signH = 44;
+    const signH = 64;
     const signX = FAC_X + FAC_W / 2 - signW / 2;
     const signY = FAC_Y + 18;
     g.fillStyle(0x0d0d0d, 1);
@@ -516,29 +491,11 @@ export class BossScene extends Phaser.Scene {
     g.fillStyle(0xcc2200, 1);
     g.fillRect(signX + 2, signY + 2, signW - 4, 3);
     g.fillRect(signX + 2, signY + signH - 5, signW - 4, 3);
-    this.add.text(signX + signW / 2, signY + signH / 2, "SMOG CORP", {
-      fontSize: "18px", fontFamily: "'Press Start 2P'",
-      color: "#ff4400",
+    this.add.text(signX + signW / 2, signY + signH / 2, "CONTAMINANTES\nSA DE CV", {
+      fontSize: "13px", fontFamily: "'Press Start 2P'",
+      color: "#ff4400", align: "center", lineSpacing: 6,
     }).setOrigin(0.5).setDepth(3);
 
-    // ── Horizontal pipes ──────────────────────────────────────────
-    g.fillStyle(0x2a2a2a, 1);
-    g.fillRect(FAC_X, FLOOR_Y - 80, FAC_W, 14);
-    g.fillRect(FAC_X, FLOOR_Y - 140, FAC_W * 0.4, 10);
-    g.fillRect(FAC_X + FAC_W * 0.6, FLOOR_Y - 160, FAC_W * 0.4, 10);
-    g.fillStyle(0x1a1a1a, 1);
-    g.fillRect(FAC_X, FLOOR_Y - 76, FAC_W, 4);
-
-    // ── Concrete floor in front ───────────────────────────────────
-    g.fillStyle(0x1e1e1e, 1);
-    g.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
-    g.fillStyle(0x2a2a2a, 1);
-    g.fillRect(0, FLOOR_Y, W, 6);
-    // Floor cracks/lines
-    g.lineStyle(1, 0x2e2e2e, 0.6);
-    for (let x = 80; x < W; x += 80) {
-      g.beginPath(); g.moveTo(x, FLOOR_Y); g.lineTo(x, H); g.strokePath();
-    }
   }
 
   private setupPlatform() {
@@ -555,19 +512,9 @@ export class BossScene extends Phaser.Scene {
   // ── HUD ───────────────────────────────────────────────────────────
 
   private setupHUD() {
-    // Boss bar background + label
-    this.add.rectangle(W / 2, 22, W * 0.7, 28, 0x111111, 0.85)
-      .setScrollFactor(0).setDepth(20);
-    this.add.text(W / 2, 22, "FÁBRICA DE SMOG", {
-      fontSize: "9px", fontFamily: "'Press Start 2P'", color: "#ff4400",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(21);
 
     this.bossBarGfx = this.add.graphics().setScrollFactor(0).setDepth(22);
 
-    // Player health (same style as GameScene)
-    this.add.text(20, 20, "AIRE", {
-      fontSize: "10px", fontFamily: "'Press Start 2P'", color: "#ffffff",
-    }).setScrollFactor(0).setDepth(20);
     this.healthBarGfx = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.drawHealthBar();
 
@@ -583,7 +530,7 @@ export class BossScene extends Phaser.Scene {
   private drawBossBar(fraction: number) {
     const bw = W * 0.66;
     const bx = W / 2 - bw / 2;
-    const by = 32;
+    const by = 78;
     const bh = 14;
     this.bossBarGfx.clear();
     this.bossBarGfx.fillStyle(0x330000, 1);
@@ -596,43 +543,85 @@ export class BossScene extends Phaser.Scene {
   }
 
   private drawHealthBar() {
-    const segments = 10;
-    const segH = 16, segGap = 1, innerW = 22, railW = 7;
-    const totalW = innerW + railW * 2;
-    const totalH = segments * segH + (segments - 1) * segGap;
-    const barX = 20, barTop = 38;
     this.healthBarGfx.clear();
 
-    this.healthBarGfx.fillStyle(0x222222, 1);
-    this.healthBarGfx.fillRect(barX, barTop - 10, totalW, 10);
-    this.healthBarGfx.fillStyle(0x110000, 1);
-    this.healthBarGfx.fillRect(barX + railW, barTop, innerW, totalH);
+    // ── Pixel heart ───────────────────────────────────────────────
+    const px = 5;
+    const hx = 16, hy = 28;
+    const heart = [
+      [0,1,1,0,1,1,0],
+      [1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1],
+      [0,1,1,1,1,1,0],
+      [0,0,1,1,1,0,0],
+      [0,0,0,1,0,0,0],
+    ];
+    this.healthBarGfx.fillStyle(0x550000, 1);
+    for (let r = 0; r < heart.length; r++)
+      for (let c = 0; c < heart[r].length; c++)
+        if (heart[r][c]) this.healthBarGfx.fillRect(hx + c * px + 2, hy + r * px + 2, px, px);
+    this.healthBarGfx.fillStyle(0xcc1111, 1);
+    for (let r = 0; r < heart.length; r++)
+      for (let c = 0; c < heart[r].length; c++)
+        if (heart[r][c]) this.healthBarGfx.fillRect(hx + c * px, hy + r * px, px, px);
+    this.healthBarGfx.fillStyle(0xff6666, 1);
+    this.healthBarGfx.fillRect(hx + 1 * px, hy + 0 * px, px, px);
+    this.healthBarGfx.fillRect(hx + 4 * px, hy + 0 * px, px, px);
+    this.healthBarGfx.fillStyle(0xffffff, 0.7);
+    this.healthBarGfx.fillRect(hx + 1 * px, hy + 0 * px, 3, 3);
+    this.healthBarGfx.fillRect(hx + 4 * px, hy + 0 * px, 3, 3);
 
-    for (let i = 0; i < segments; i++) {
-      const segY   = barTop + totalH - (i + 1) * segH - i * segGap;
-      const filled = i < this.health;
-      if (filled) {
-        this.healthBarGfx.fillStyle(0xcc2200, 1);
-        this.healthBarGfx.fillRect(barX + railW, segY + segH / 2, innerW, segH / 2);
-        this.healthBarGfx.fillStyle(0xff7722, 1);
-        this.healthBarGfx.fillRect(barX + railW, segY, innerW, segH / 2);
-        this.healthBarGfx.fillStyle(0xffcc66, 0.35);
-        this.healthBarGfx.fillRect(barX + railW, segY, innerW, 2);
-      } else {
-        this.healthBarGfx.fillStyle(0x1e0000, 1);
-        this.healthBarGfx.fillRect(barX + railW, segY, innerW, segH);
-      }
-      this.healthBarGfx.fillStyle(0x000000, 1);
-      this.healthBarGfx.fillRect(barX + railW, segY + segH - 1, innerW, 1);
+    // ── Segmented bar ─────────────────────────────────────────────
+    const segments = 10;
+    const heartW = 7 * px;
+    const barX = hx + heartW + 18, barH = 22, barW = 230;
+    const barY = hy + (heart.length * px - barH) / 2;
+    const border = 3, corner = 5, ic = corner - border;
+    const segW = barW / segments;
+
+    let hi: number, lo: number;
+    if (this.health >= 7)      { hi = 0x44cc55; lo = 0x228833; }
+    else if (this.health >= 4) { hi = 0xffbb00; lo = 0xcc7700; }
+    else                       { hi = 0xee3311; lo = 0xaa1100; }
+
+    const bx = barX - border, by = barY - border, bw = barW + border * 2, bh = barH + border * 2;
+    const step = corner - border;
+    this.healthBarGfx.fillStyle(0x000000, 1);
+    this.healthBarGfx.fillRect(bx + corner,        by,                  bw - corner * 2, border);
+    this.healthBarGfx.fillRect(bx + corner,        by + bh - border,    bw - corner * 2, border);
+    this.healthBarGfx.fillRect(bx,                 by + corner,         border, bh - corner * 2);
+    this.healthBarGfx.fillRect(bx + bw - border,   by + corner,         border, bh - corner * 2);
+    this.healthBarGfx.fillRect(bx + border,              by + border,             step, step);
+    this.healthBarGfx.fillRect(bx + bw - border - step,  by + border,             step, step);
+    this.healthBarGfx.fillRect(bx + border,              by + bh - border - step, step, step);
+    this.healthBarGfx.fillRect(bx + bw - border - step,  by + bh - border - step, step, step);
+
+    for (let i = 0; i < this.health; i++) {
+      const sx = barX + i * segW;
+      const clipL = i === 0            ? ic : 0;
+      const clipR = i === segments - 1 ? ic : 0;
+      const adjW  = segW - clipL - clipR;
+      this.healthBarGfx.fillStyle(hi, 1);
+      this.healthBarGfx.fillRect(sx + clipL, barY,        adjW, ic);
+      this.healthBarGfx.fillRect(sx,         barY + ic,   segW, barH / 2 - ic);
+      this.healthBarGfx.fillStyle(lo, 1);
+      this.healthBarGfx.fillRect(sx,         barY + barH / 2,      segW, barH / 2 - ic);
+      this.healthBarGfx.fillRect(sx + clipL, barY + barH - ic,     adjW, ic);
     }
-    for (const rx of [barX, barX + railW + innerW]) {
-      this.healthBarGfx.fillStyle(0x888888, 1);
-      this.healthBarGfx.fillRect(rx, barTop, railW, totalH);
-      this.healthBarGfx.fillStyle(0xdddddd, 1);
-      this.healthBarGfx.fillRect(rx, barTop, 2, totalH);
+    this.healthBarGfx.fillStyle(0x000000, 1);
+    for (let i = 1; i < segments; i++)
+      this.healthBarGfx.fillRect(barX + i * segW - 1, barY, 2, barH);
+
+    if (this.health <= 2 && !this.criticalTween) {
+      this.criticalTween = this.tweens.add({
+        targets: this.healthBarGfx, alpha: 0.25,
+        duration: 300, ease: "Sine.easeInOut", yoyo: true, repeat: -1,
+      });
+    } else if (this.health > 2 && this.criticalTween) {
+      this.criticalTween.stop();
+      this.criticalTween = null;
+      this.healthBarGfx.setAlpha(1);
     }
-    this.healthBarGfx.fillStyle(0x222222, 1);
-    this.healthBarGfx.fillRect(barX, barTop + totalH, totalW, 8);
   }
 
   // ── Smoke ─────────────────────────────────────────────────────────
@@ -767,11 +756,11 @@ export class BossScene extends Phaser.Scene {
     const baseSpd  = 280;
     const spawnX   = from === "left" ? -30 : W + 30;
     const velX     = from === "left" ? baseSpd * speedMul : -baseSpd * speedMul;
-    this.spawnProjectile(spawnX, y, velX, 0, 0xcc4400);
+    this.spawnProjectile(spawnX, y, velX, 0, 0xbbbbbb);
   }
 
   private fireFromTop(x: number) {
-    this.spawnProjectile(x, -30, Phaser.Math.FloatBetween(-30, 30), 0, 0x88cc00, true);
+    this.spawnProjectile(x, -30, Phaser.Math.FloatBetween(-30, 30), 0, 0x999999, true);
   }
 
   private fireDiagonal(from: "top-left" | "top-right") {
@@ -780,14 +769,14 @@ export class BossScene extends Phaser.Scene {
     const spd = 240 * speedMul;
     const x   = from === "top-left" ? -30 : W + 30;
     const vx  = from === "top-left" ?  spd : -spd;
-    this.spawnProjectile(x, -30, vx, spd * 0.7, 0xcc8800);
+    this.spawnProjectile(x, -30, vx, spd * 0.7, 0xaaaaaa);
   }
 
   private fireRain(count: number) {
     const step = W / (count + 1);
     for (let i = 1; i <= count; i++) {
       const x = step * i + Phaser.Math.Between(-40, 40);
-      this.time.delayedCall(i * 80, () => this.spawnProjectile(x, -30, Phaser.Math.FloatBetween(-20, 20), 0, 0x44cc88, true));
+      this.time.delayedCall(i * 80, () => this.spawnProjectile(x, -30, Phaser.Math.FloatBetween(-20, 20), 0, 0x999999, true));
     }
   }
 
@@ -862,13 +851,31 @@ export class BossScene extends Phaser.Scene {
   // ── Hit & death ───────────────────────────────────────────────────
 
   private onHit() {
-    if (this.invincible || this.maskInvincible || this.levelComplete) return;
+    if (this.invincible || this.levelComplete) return;
     this.invincible = true;
     this.health     = Math.max(0, this.health - 1);
     this.drawHealthBar();
     this.sfx("sfx_hit", 0.7);
+    const character = this.registry.get("character") as string ?? "";
+    const isFemale  = character.toLowerCase().includes("female");
+    const hitKey = isFemale ? "sfx_hit_female" : "sfx_hit_male";
+    if (this.cache.audio.exists(hitKey)) {
+      const hitSfx = this.sound.add(hitKey, { volume: 0.8 });
+      hitSfx.play({ seek: isFemale ? 0.3 : 0 });
+      const cutoff = isFemale ? 1000 : 800;
+      this.time.delayedCall(cutoff, () => { if (hitSfx.isPlaying) hitSfx.stop(); hitSfx.destroy(); });
+    }
     this.player.setTint(0xff4444);
-    this.cameras.main.shake(200, 0.007);
+    this.tweens.add({
+      targets: this.player, x: this.player.x - 6,
+      duration: 50, yoyo: true, repeat: 3, ease: "Sine.easeInOut",
+    });
+    this.tweens.add({
+      targets: this.player, alpha: 0.2,
+      duration: 80, yoyo: true, repeat: 1, ease: "Stepped",
+      onComplete: () => this.player.setAlpha(1),
+    });
+    this.cameras.main.shake(220, 0.007);
 
     this.vignetteRect.setAlpha(0.45);
     this.tweens.add({ targets: this.vignetteRect, alpha: 0, duration: 500 });
@@ -929,95 +936,9 @@ export class BossScene extends Phaser.Scene {
     });
   }
 
-  // ── Power-up: cubrebocas ─────────────────────────────────────────
-
-  private setupPowerups() {
-    this.powerups = this.physics.add.staticGroup();
-
-    // Spawn 3 masks at fixed positions across the arena
-    for (const x of [220, W / 2, W - 220]) {
-      this.spawnMaskAt(x);
-    }
-
-    this.physics.add.overlap(this.player, this.powerups, (_p, mask) => {
-      (mask as Phaser.Physics.Arcade.Image).destroy();
-      this.activateMask();
-    });
-  }
-
-  private spawnMaskAt(x: number) {
-    const y   = FLOOR_Y - 48;
-    const key = `bmask_${x}`;
-    const gfx = this.make.graphics({ x: 0, y: 0 } as any);
-    gfx.fillStyle(0xe8f4ff, 1);
-    gfx.fillRoundedRect(2, 8, 44, 28, 6);
-    gfx.lineStyle(1.5, 0xaaccee, 0.7);
-    gfx.lineBetween(2, 16, 46, 16);
-    gfx.lineBetween(2, 24, 46, 24);
-    gfx.lineBetween(2, 32, 46, 32);
-    gfx.lineStyle(2, 0xaaaaaa, 1);
-    gfx.strokeCircle(4, 16, 6);
-    gfx.strokeCircle(44, 16, 6);
-    gfx.fillStyle(0x8899aa, 1);
-    gfx.fillRect(10, 8, 28, 3);
-    gfx.lineStyle(2, 0x44aaff, 0.8);
-    gfx.strokeRoundedRect(2, 8, 44, 28, 6);
-    gfx.generateTexture(key, 48, 48);
-    gfx.destroy();
-
-    const mask = this.powerups.create(x, y, key) as Phaser.Physics.Arcade.Image;
-    mask.setDepth(12).refreshBody();
-
-    this.tweens.add({ targets: mask, y: y - 12, duration: 900, ease: "Sine.easeInOut", yoyo: true, repeat: -1 });
-    this.tweens.add({ targets: mask, alpha: 0.55, duration: 650, ease: "Sine.easeInOut", yoyo: true, repeat: -1 });
-  }
-
-  private activateMask() {
-    this.maskInvincible = true;
-    this.maskEndTime    = this.time.now + 6000;
-    this.sfx("sfx_powerup", 0.8);
-
-    const txt = this.add.text(this.player.x, this.player.y - 90, "¡CUBREBOCAS!", {
-      fontSize: "14px", fontFamily: "'Press Start 2P'",
-      color: "#44eeff", stroke: "#003355", strokeThickness: 5,
-    }).setOrigin(0.5).setDepth(30);
-    this.tweens.add({ targets: txt, y: txt.y - 50, alpha: 0, duration: 1400, ease: "Quad.Out", onComplete: () => txt.destroy() });
-
-    this.player.clearTint();
-    this.player.setTint(0x44eeff);
-    this.blinkTween = this.tweens.add({ targets: this.player, alpha: 0.3, duration: 120, yoyo: true, repeat: -1 });
-    this.drawMaskBar(1);
-  }
-
-  private deactivateMask() {
-    this.maskInvincible = false;
-    this.blinkTween?.stop();
-    this.blinkTween = null;
-    this.player.setAlpha(1);
-    this.player.clearTint();
-    this.maskBarGfx.clear();
-    this.maskIcon.clear();
-  }
-
-  private drawMaskBar(fraction: number) {
-    const bx = 20, by = H - 36, bw = 120, bh = 10;
-    this.maskBarGfx.clear();
-    this.maskBarGfx.fillStyle(0x111111, 0.8);
-    this.maskBarGfx.fillRect(bx, by, bw, bh);
-    this.maskBarGfx.fillStyle(0x44eeff, 1);
-    this.maskBarGfx.fillRect(bx, by, bw * fraction, bh);
-    this.maskBarGfx.lineStyle(1, 0x0088aa, 1);
-    this.maskBarGfx.strokeRect(bx, by, bw, bh);
-    this.maskIcon.clear();
-    this.maskIcon.fillStyle(0x44eeff, 0.9);
-    this.maskIcon.fillRoundedRect(bx, by - 18, 14, 10, 2);
-    this.maskIcon.lineStyle(1, 0x0088aa, 1);
-    this.maskIcon.strokeRoundedRect(bx, by - 18, 14, 10, 2);
-  }
-
   // ── Util ──────────────────────────────────────────────────────────
 
-  private sfx(_key: string, _volume = 1) {
-    // if (this.cache.audio.exists(_key)) this.sound.play(_key, { volume: _volume });
+  private sfx(key: string, volume = 1) {
+    if (this.cache.audio.exists(key)) this.sound.play(key, { volume });
   }
 }
