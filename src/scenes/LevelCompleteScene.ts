@@ -207,15 +207,25 @@ export class LevelCompleteScene extends Phaser.Scene {
 
   private showFinish() {
     this.typeSound.stop();
-    [this.dimmer, this.boxBg, this.boxBorder, this.accentBar,
-     this.portrait, this.lineG, this.textObj, this.promptText].forEach(o =>
-      this.tweens.add({ targets: o, alpha: 0, duration: 600 })
-    );
-    this.time.delayedCall(1800, () => {
-      this.cameras.main.fadeOut(1000, 0, 0, 0);
-      this.cameras.main.once("camerafadeoutcomplete", () => {
-        this.sound.stopAll();
-        this.scene.start("BootScene");
+
+    // Pausa de 3s con el último mensaje visible, luego fade out del dialog box
+    this.time.delayedCall(3000, () => {
+      [this.dimmer, this.boxBg, this.boxBorder, this.accentBar,
+       this.portrait, this.lineG, this.textObj, this.promptText].forEach(o =>
+        this.tweens.add({ targets: o, alpha: 0, duration: 800 })
+      );
+
+      // Música se apaga mientras el cuarto sigue visible
+      const music = this.sound.getAll("end_theme").find(s => s.isPlaying) ?? this.sound.get("end_theme");
+      if (music) this.tweens.add({ targets: music, volume: 0, duration: 2500 });
+
+      // Fade a negro después de que desaparece el dialog
+      this.time.delayedCall(2800, () => {
+        this.cameras.main.fadeOut(1800, 0, 0, 0);
+        this.cameras.main.once("camerafadeoutcomplete", () => {
+          this.sound.stopAll();
+          this.scene.start("BootScene");
+        });
       });
     });
   }
