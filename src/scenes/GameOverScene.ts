@@ -122,7 +122,7 @@ export class GameOverScene extends Phaser.Scene {
       if (OPTIONS[this.selected].key === "level") {
         this.scene.start(this.from);
       } else {
-        this.scene.start("StartScene");
+        this.scene.start("DataScene");
       }
     });
   }
